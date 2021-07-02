@@ -1,0 +1,6 @@
+numpy
+opencv-contrib-python
+yarp
+pandas
+wheel
+sklearn
