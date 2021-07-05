@@ -45,6 +45,11 @@ class Classifier(yarp.RFModule):
     def configure(self, rf):
         self.module_name = rf.find("module_name").asString()
 
+        self.cmd_port = yarp.Port()
+        self.cmd_port.open('/classifier/command:i')
+        print('{:s} opened'.format('/classifier/command:i'))
+        self.attach(self.cmd_port)
+
         # input port for rgb image
         self.in_port_human_image = yarp.BufferedPortImageRgb()
         self.in_port_human_image.open('/classifier/image:i')
