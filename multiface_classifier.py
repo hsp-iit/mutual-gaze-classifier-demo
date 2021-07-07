@@ -3,17 +3,16 @@
 import numpy as np
 import yarp
 import sys
-import cv2
 import pickle as pk
 
 from config import IMAGE_HEIGHT, IMAGE_WIDTH, NUM_JOINTS
 from utilities import read_openpose_data, get_features
-from utilities import draw_on_img, create_bottle
+from utilities import draw_on_img, get_human_idx, create_bottle
 
 
 yarp.Network.init()
 
-class Classifier(yarp.RFModule):
+class MultiFaceClassifier(yarp.RFModule):
     def configure(self, rf):
         self.module_name = rf.find("module_name").asString()
 
@@ -51,10 +50,10 @@ class Classifier(yarp.RFModule):
         print('{:s} opened'.format('/classifier/image:o'))
 
         self.clf = pk.load(open('model_svm.pkl', 'rb'))
-        self.threshold = 3           # to reset the buffer
-        self.buffer = ((0, 0), 0, 0) # centroid, prediction and level of confidence
+        self.threshold = 5           # to reset the buffer
+        self.buffer = yarp.Bottle()  # each element is ((0, 0), 0, 0) centroid, prediction and level of confidence
         self.counter = 0             # counter for the threshold
-        self.svm_buffer = []
+        self.svm_buffer = (np.array([], dtype=object)).tolist()
 
         return True
 
@@ -103,6 +102,7 @@ class Classifier(yarp.RFModule):
                 # get features of all people in the image
                 data = get_features(poses, conf_poses, faces, conf_faces)
 
+                idx_humans_frame = []
                 if data:
                     # predict model
                     # start from 2 because there is the centroid valued in the position [0,1]
@@ -114,58 +114,77 @@ class Classifier(yarp.RFModule):
 
                     # return a prob value between 0,1 for each class
                     y_classes = self.clf.predict_proba(wx)
-                    # take only the person with id 0, we suppose that there is only one person in the scene
-                    itP = 0
-                    prob = max(y_classes[itP])
-                    y_pred = (np.where(y_classes[itP] == prob))[0]
 
-                    if len(self.svm_buffer) == 3:
-                        self.svm_buffer.pop(0)
+                    output_pred_bottle = yarp.Bottle()
+                    for itP in range(0, y_classes.shape[0]):
+                        prob = max(y_classes[itP])
+                        y_pred = (np.where(y_classes[itP] == prob))[0]
 
-                    self.svm_buffer.append([y_pred[0], prob])
+                        min_dist, idx = get_human_idx(self.svm_buffer, ld[itP, 0:2])
+                        if (idx != None and min_dist != None) and ((len(self.svm_buffer) == y_classes.shape[0]) or (min_dist < 100)): # suppose min dist < 50 frames
+                            idx_humans_frame.append(idx)
+                            if len(self.svm_buffer[idx]) == 3:
+                                self.svm_buffer[idx].pop(0)
 
-                    count_class_0 = [self.svm_buffer[i][0] for i in range(0, len(self.svm_buffer))].count(0)
-                    count_class_1 = [self.svm_buffer[i][0] for i in range(0, len(self.svm_buffer))].count(1)
-                    if (count_class_1 == count_class_0):
-                        y_winner = y_pred[0]
-                        prob_mean = prob
-                    else:
-                        y_winner = np.argmax([count_class_0, count_class_1])
-                        prob_values = np.array(
-                            [self.svm_buffer[i][1] for i in range(0, len(self.svm_buffer)) if self.svm_buffer[i][0] == y_winner])
-                        prob_mean = np.mean(prob_values)
+                            self.svm_buffer[idx].append([ld[itP, 0], ld[itP, 1], y_pred[0], prob])
 
-                    pred = create_bottle(((ld[itP,0], ld[itP,1]), y_winner, prob_mean))
-                    human_image = draw_on_img(human_image, (ld[itP,0], ld[itP,1]), y_winner, prob_mean)
+                            count_class_0 = [(self.svm_buffer[idx])[i][2] for i in range(0, len(self.svm_buffer[idx]))].count(0)
+                            count_class_1 = [(self.svm_buffer[idx])[i][2] for i in range(0, len(self.svm_buffer[idx]))].count(1)
+                            if (count_class_1 == count_class_0):
+                                y_winner = y_pred[0]
+                                prob_mean = prob
+                            else:
+                                y_winner = np.argmax([count_class_0, count_class_1])
+                                prob_values = np.array([(self.svm_buffer[idx])[i][3] for i in range(0, len(self.svm_buffer[idx])) if (self.svm_buffer[idx])[i][2] == y_winner])
+                                prob_mean = np.mean(prob_values)
+
+                        else:
+                            self.svm_buffer.append([[ld[itP, 0], ld[itP, 1], y_pred[0], prob]])
+                            print("add humans to the scene: %d" % len(self.svm_buffer))
+                            idx_humans_frame.append(len(self.svm_buffer)-1)
+                            y_winner = y_pred[0]
+                            prob_mean = prob
+
+
+                        pred = create_bottle(((ld[itP,0], ld[itP,1]), y_winner, prob_mean))
+                        output_pred_bottle.addList().read(pred)
+                        human_image = draw_on_img(human_image, (ld[itP,0], ld[itP,1]), y_winner, prob_mean)
+
+                    self.buffer.copy(output_pred_bottle)
+                    self.counter = 0
 
                     self.out_buf_human_array[:, :] = human_image
-                    self.out_port_prediction.write(pred)
-
-                    self.buffer = ((ld[itP,0], ld[itP,1]), y_winner, prob_mean)
-                    self.counter = 0
+                    self.out_port_prediction.write(output_pred_bottle)
                 else:
                     if self.counter < self.threshold:
-                        human_image = draw_on_img(human_image, self.buffer[0], self.buffer[1], self.buffer[2])
-                        pred = create_bottle(self.buffer)
+                        for i in range(0, self.buffer.size()):
+                            buffer = self.buffer.get(i).asList()
+                            centroid = buffer.get(0).asList()
+                            human_image = draw_on_img(human_image, (centroid.get(0).asDouble(), centroid.get(1).asDouble()), buffer.get(1).asInt(), buffer.get(2).asDouble())
 
                         self.out_buf_human_array[:, :] = human_image
-                        self.out_port_prediction.write(pred)
+                        self.out_port_prediction.write(self.buffer)
 
                         self.counter = self.counter + 1
-                    else:
-                        self.out_buf_human_array[:, :] = human_image
+                    self.out_buf_human_array[:, :] = human_image
+
+                for i in range(0, len(self.svm_buffer)):
+                    if not (i in idx_humans_frame):
+                        self.svm_buffer.pop(i)
+                        print("remove humans in the scene: %d" % len(self.svm_buffer))
 
             else:
                 if self.counter < self.threshold:
                     # send in output the buffer
-                    human_image = draw_on_img(human_image, self.buffer[0], self.buffer[1], self.buffer[2])
-                    pred = create_bottle(self.buffer)
+                    for i in range(0, self.buffer.size()):
+                        buffer = self.buffer.get(i).asList()
+                        centroid = buffer.get(0).asList()
+                        human_image = draw_on_img(human_image, (centroid.get(0).asDouble(), centroid.get(1).asDouble()), buffer.get(1).asInt(), buffer.get(2).asDouble())
 
                     # write rgb image
                     self.out_buf_human_array[:, :] = human_image
                     # write prediction bottle
-                    self.out_port_prediction.write(pred)
-
+                    self.out_port_prediction.write(self.buffer)
                     self.counter = self.counter + 1
                 else:
                     # send in output only the image without prediction
@@ -192,5 +211,5 @@ if __name__ == '__main__':
     rf.configure(sys.argv)
 
     # Run module
-    manager = Classifier()
+    manager = MultiFaceClassifier()
     manager.runModule(rf)

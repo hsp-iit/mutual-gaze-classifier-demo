@@ -1,6 +1,8 @@
 #!/usr/bin/python3
 
 import numpy as np
+import yarp
+import cv2
 from config import JOINTS_POSE, JOINTS_FACE
 
 
@@ -81,10 +83,8 @@ def get_features(poses, conf_poses, faces, conf_faces):
             if features is not None:
                 featMap = np.asarray(features)
                 #featMap = np.reshape(featMap, (1, 3 * NUM_JOINTS))
-
                 centr = np.asarray(centr)
                 #centr = np.reshape(centr, (1, 2))
-
                 poseFeats = np.concatenate((centr, featMap))
 
                 data.append(poseFeats)
@@ -120,35 +120,81 @@ def read_openpose_data(received_data):
     body = []
     face = []
     if received_data:
+        received_data = received_data.get(0).asList()
         for i in range(0, received_data.size()):
-            person = received_data.get(i).asList()
+            keypoints = received_data.get(i).asList()
 
-            if person is not None:
-                keypoints = person.get(0).asList()
+            # if person is not None:
+            #     keypoints = person.get(0).asList()
 
-                if keypoints:
-                    body_person = []
-                    face_person = []
-                    for y in range(0, keypoints.size()):
-                        part = keypoints.get(y).asList()
-                        if part:
-                            if part.get(0).asString() == "Face":
-                                for z in range(1, part.size()):
-                                    item = part.get(z).asList()
-                                    face_part = [item.get(0).asDouble(), item.get(1).asDouble(), item.get(2).asDouble()]
+            if keypoints:
+                body_person = []
+                face_person = []
+                for y in range(0, keypoints.size()):
+                    part = keypoints.get(y).asList()
+                    if part:
+                        if part.get(0).asString() == "Face":
+                            for z in range(1, part.size()):
+                                item = part.get(z).asList()
+                                face_part = [item.get(0).asDouble(), item.get(1).asDouble(), item.get(2).asDouble()]
 
-                                    face_person.append(face_part)
-                            else:
-                                body_part = [part.get(1).asDouble(), part.get(2).asDouble(), part.get(3).asDouble()]
+                                face_person.append(face_part)
+                        else:
+                            body_part = [part.get(1).asDouble(), part.get(2).asDouble(), part.get(3).asDouble()]
 
-                            body_person.append(body_part)
+                        body_person.append(body_part)
 
-                    if body_person and face_person:
-                        body.append(body_person)
-                        face.append(face_person)
+                if body_person and face_person:
+                    body.append(body_person)
+                    face.append(face_person)
 
     poses, conf_poses = load_many_poses(body)
     faces, conf_faces = load_many_faces(face)
 
     return poses, conf_poses, faces, conf_faces
 
+
+def get_human_idx(buffer_output, centroid):
+    #suppose that in the two first element of buffer output there is the centroid
+    dist = []
+    for i in range(0, len(buffer_output)):
+        buffer_person = buffer_output[i]
+        if len(buffer_person) != 0:
+            dist.append(dist_2d((buffer_person[-1])[0:2], centroid))
+
+    if len(dist) != 0:
+        min_dist = min(dist)
+        idx = dist.index(min_dist)
+        return min_dist, idx
+    else:
+        return None, None
+
+
+def create_bottle(output):
+    centroid = output[0]
+    centroid_bottle = yarp.Bottle()
+    centroid_bottle.addDouble(centroid[0])
+    centroid_bottle.addDouble(centroid[1])
+
+    output_bottle = yarp.Bottle()
+    output_bottle.addList().read(centroid_bottle)
+    output_bottle.addInt(int(output[1]))
+    output_bottle.addDouble(float(output[2]))
+
+    return output_bottle
+
+
+def draw_on_img(img, centroid, y_pred, prob):
+
+    # write index close to the centroid
+    #img = cv2.putText(img, str(id), tuple([int(centroid[0]), int(centroid[1])-100]), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2, cv2.LINE_AA)
+
+    if y_pred == 0:
+        txt = 'EC NO'
+    else:
+        txt = 'EC YES'
+
+    img = cv2.putText(img, txt, tuple([int(centroid[0]), int(centroid[1])-120]), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2, cv2.LINE_AA)
+    img = cv2.putText(img, 'c: %0.2f' % prob, tuple([int(centroid[0]), int(centroid[1]) - 90]), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2, cv2.LINE_AA)
+
+    return img
