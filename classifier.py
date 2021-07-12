@@ -50,22 +50,38 @@ class Classifier(yarp.RFModule):
         self.out_buf_human_image.setExternal(self.out_buf_human_array.data, self.out_buf_human_array.shape[1], self.out_buf_human_array.shape[0])
         print('{:s} opened'.format('/classifier/image:o'))
 
+        # output port for dumper
+        self.out_port_human_image_dump = yarp.Port()
+        self.out_port_human_image_dump.open('/classifier/dump:o')
+        self.out_buf_human_array_dump = np.ones((IMAGE_HEIGHT, IMAGE_WIDTH, 3), dtype=np.uint8)
+        self.out_buf_human_image_dump = yarp.ImageRgb()
+        self.out_buf_human_image_dump.resize(IMAGE_WIDTH, IMAGE_HEIGHT)
+        self.out_buf_human_image_dump.setExternal(self.out_buf_human_array_dump.data, self.out_buf_human_array_dump.shape[1], self.out_buf_human_array_dump.shape[0])
+        print('{:s} opened'.format('/classifier/dump:o'))
+
         self.clf = pk.load(open('model_svm.pkl', 'rb'))
         self.threshold = 3           # to reset the buffer
         self.buffer = ((0, 0), 0, 0) # centroid, prediction and level of confidence
         self.counter = 0             # counter for the threshold
+        self.svm_buffer_size = 3
         self.svm_buffer = []
+        self.id_image = '%08d' % 0
+
+        self.human_image = np.ones((IMAGE_HEIGHT, IMAGE_WIDTH, 3), dtype=np.uint8)
+        self.pred = yarp.Bottle()
 
         return True
 
     def respond(self, command, reply):
         if command.get(0).asString() == 'quit':
-            out_command = 'quit'
-            out_pred_bottle = self.out_port_prediction.prepare()
-            out_pred_bottle.clear()
-            out_pred_bottle.addString(out_command)
-            self.out_port_prediction.write()
-            reply.addString('quit command sent')
+            print('received command QUIT')
+            self.cleanup()
+            reply.addString('QUIT command sent')
+        elif command.get(0).asString() == 'get':
+            print('received command GET')
+            self.out_buf_human_array_dump[:, :] = self.human_image
+            self.out_port_human_image_dump.write(self.out_buf_human_image_dump)
+            reply.copy(self.pred)
         else:
             print('Command {:s} not recognized'.format(command.get(0).asString()))
             reply.addString('Command {:s} not recognized'.format(command.get(0).asString()))
@@ -91,10 +107,13 @@ class Classifier(yarp.RFModule):
         return 0.001
 
     def updateModule(self):
-        received_image = self.in_port_human_image.read()
-        received_data = self.in_port_human_data.read(False) #non blocking
 
-        if received_image:
+        received_data = self.in_port_human_data.read()      #False for non blocking
+        received_image = self.in_port_human_image.read()
+
+
+        if received_image and received_data:
+        #if received_image:
             self.in_buf_human_image.copy(received_image)
             human_image = np.copy(self.in_buf_human_array)
 
@@ -119,7 +138,7 @@ class Classifier(yarp.RFModule):
                     prob = max(y_classes[itP])
                     y_pred = (np.where(y_classes[itP] == prob))[0]
 
-                    if len(self.svm_buffer) == 3:
+                    if len(self.svm_buffer) == self.svm_buffer_size:
                         self.svm_buffer.pop(0)
 
                     self.svm_buffer.append([y_pred[0], prob])
@@ -135,43 +154,52 @@ class Classifier(yarp.RFModule):
                             [self.svm_buffer[i][1] for i in range(0, len(self.svm_buffer)) if self.svm_buffer[i][0] == y_winner])
                         prob_mean = np.mean(prob_values)
 
-                    pred = create_bottle(((ld[itP,0], ld[itP,1]), y_winner, prob_mean))
-                    human_image = draw_on_img(human_image, (ld[itP,0], ld[itP,1]), y_winner, prob_mean)
+                    pred = create_bottle((self.id_image, (ld[itP,0], ld[itP,1]), y_winner, prob_mean))
+                    human_image = draw_on_img(human_image, self.id_image, (ld[itP,0], ld[itP,1]), y_winner, prob_mean)
 
                     self.out_buf_human_array[:, :] = human_image
+                    self.out_port_human_image.write(self.out_buf_human_image)
                     self.out_port_prediction.write(pred)
+                    self.human_image = human_image
 
-                    self.buffer = ((ld[itP,0], ld[itP,1]), y_winner, prob_mean)
+                    self.buffer = (self.id_image, (ld[itP,0], ld[itP,1]), y_winner, prob_mean)
+                    self.pred.copy(pred)
+
+                    self.id_image = '%08d' % ((int(self.id_image) + 1) % 100000)
                     self.counter = 0
-                else:
-                    if self.counter < self.threshold:
-                        human_image = draw_on_img(human_image, self.buffer[0], self.buffer[1], self.buffer[2])
-                        pred = create_bottle(self.buffer)
-
-                        self.out_buf_human_array[:, :] = human_image
-                        self.out_port_prediction.write(pred)
-
-                        self.counter = self.counter + 1
-                    else:
-                        self.out_buf_human_array[:, :] = human_image
-
-            else:
-                if self.counter < self.threshold:
-                    # send in output the buffer
-                    human_image = draw_on_img(human_image, self.buffer[0], self.buffer[1], self.buffer[2])
-                    pred = create_bottle(self.buffer)
-
-                    # write rgb image
-                    self.out_buf_human_array[:, :] = human_image
-                    # write prediction bottle
-                    self.out_port_prediction.write(pred)
-
-                    self.counter = self.counter + 1
-                else:
-                    # send in output only the image without prediction
-                    self.out_buf_human_array[:, :] = human_image
-
-            self.out_port_human_image.write(self.out_buf_human_image)
+            #     else:
+            #         print("error: openpose data not found")
+            #         if self.counter < self.threshold:
+            #             human_image = draw_on_img(human_image, self.buffer[0], self.buffer[1], self.buffer[2])
+            #             pred = create_bottle(self.buffer)
+            #
+            #             self.out_buf_human_array[:, :] = human_image
+            #             self.out_port_human_image.write(self.out_buf_human_image)
+            #             self.out_port_prediction.write(pred)
+            #
+            #             self.counter = self.counter + 1
+            #         else:
+            #             self.out_buf_human_array[:, :] = human_image
+            #             self.out_port_human_image.write(self.out_buf_human_image)
+            #
+            # else:
+            #     print("error: not received data")
+            #     if self.counter < self.threshold:
+            #         # send in output the buffer
+            #         human_image = draw_on_img(human_image, self.buffer[0], self.buffer[1], self.buffer[2])
+            #         pred = create_bottle(self.buffer)
+            #
+            #         # write rgb image
+            #         self.out_buf_human_array[:, :] = human_image
+            #         self.out_port_human_image.write(self.out_buf_human_image)
+            #         # write prediction bottle
+            #         self.out_port_prediction.write(pred)
+            #
+            #         self.counter = self.counter + 1
+            #     else:
+            #         # send in output only the image without prediction
+            #         self.out_buf_human_array[:, :] = human_image
+            #         self.out_port_human_image.write(self.out_buf_human_image)
 
         return True
 

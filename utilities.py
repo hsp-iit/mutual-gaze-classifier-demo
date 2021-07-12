@@ -171,23 +171,25 @@ def get_human_idx(buffer_output, centroid):
 
 
 def create_bottle(output):
-    centroid = output[0]
+    centroid = output[1]
     centroid_bottle = yarp.Bottle()
     centroid_bottle.addDouble(centroid[0])
     centroid_bottle.addDouble(centroid[1])
 
     output_bottle = yarp.Bottle()
+    output_bottle.addString(output[0])
     output_bottle.addList().read(centroid_bottle)
-    output_bottle.addInt(int(output[1]))
-    output_bottle.addDouble(float(output[2]))
+    output_bottle.addInt(int(output[2]))
+    output_bottle.addDouble(float(output[3]))
+
 
     return output_bottle
 
 
-def draw_on_img(img, centroid, y_pred, prob):
+def draw_on_img(img, id, centroid, y_pred, prob):
 
     # write index close to the centroid
-    #img = cv2.putText(img, str(id), tuple([int(centroid[0]), int(centroid[1])-100]), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2, cv2.LINE_AA)
+    img = cv2.putText(img, 'id: ' + str(id), tuple([25, 30]), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2, cv2.LINE_AA)
 
     if y_pred == 0:
         txt = 'EC NO'

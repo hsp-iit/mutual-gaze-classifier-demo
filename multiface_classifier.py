@@ -59,11 +59,7 @@ class MultiFaceClassifier(yarp.RFModule):
 
     def respond(self, command, reply):
         if command.get(0).asString() == 'quit':
-            out_command = 'quit'
-            out_pred_bottle = self.out_port_prediction.prepare()
-            out_pred_bottle.clear()
-            out_pred_bottle.addString(out_command)
-            self.out_port_prediction.write()
+            self.cleanup()
             reply.addString('quit command sent')
         else:
             print('Command {:s} not recognized'.format(command.get(0).asString()))
