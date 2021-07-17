@@ -59,11 +59,19 @@ RUN cd /projects/robotology-superbuild/build && \
     make
 RUN export PYTHONPATH=/projects/robotology-superbuild/build/src/YARP/lib/python3
 
-#### Clone repository ####
-
+#### Clone repository installation ####
+RUN apt-get update
 ARG username
 ARG password
 
 RUN cd /projects/ && \
     git clone https://${username}:${password}@github.com/MariaLombardi/mutual-gaze-classifier-demo.git
+
+RUN cd /projects/mutual-gaze-classifier-demo && \
+    mkdir build && cd build && \
+    cmake .. \
+    &&\
+    make \
+    &&\
+    make install
 
