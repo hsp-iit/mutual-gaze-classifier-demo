@@ -57,12 +57,13 @@ RUN cd /projects/robotology-superbuild/build && \
     -DROBOTOLOGY_USES_PYTHON=ON \
     &&\
     make
-RUN export PYTHONPATH=/projects/robotology-superbuild/build/src/YARP/lib/python3
+
 
 #### Clone repository installation ####
-RUN apt-get update
 ARG username
 ARG password
+
+RUN export PYTHONPATH=/projects/robotology-superbuild/build/src/YARP/lib/python3
 
 RUN cd /projects/ && \
     git clone https://${username}:${password}@github.com/MariaLombardi/mutual-gaze-classifier-demo.git
