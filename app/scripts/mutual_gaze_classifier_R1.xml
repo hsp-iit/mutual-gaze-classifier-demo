@@ -1,0 +1,82 @@
+<application>
+<name>mutual gaze classifier</name>
+<version>1.0</version>
+
+<!-- Modules -->
+	<module>
+		<name>yarpdev --from /usr/local/src/robot/robots-configuration/R1SN003/sensors/RealSense_conf.ini</name>
+		<parameters></parameters>
+		<node>r1-torso</node>
+	</module>
+
+	<module>
+		<name>yarpOpenPose --from /usr/local/src/robot/icub-contrib-iit/human-sensing/yarpOpenPose/app/conf/yarpOpenPose.ini</name>
+		<parameters></parameters>
+		<node>r1-console-cuda</node>
+	</module>
+
+	<module>
+		<name>classifier.py --from /usr/local/share/ICUBcontrib/contexts/mutual-gaze-classifier-demo/classifier_conf.ini</name>
+		<parameters></parameters>
+		<deployer>python3.6</deployer>
+		<node>localhost</node>
+	</module>
+
+	<module>
+		<name>yarpview</name>
+		<parameters>--name /view/rgb --w 640 --h 480</parameters>
+		<node>localhost</node>
+	</module>
+
+	<module>
+		<name>yarpview</name>
+		<parameters>--name /view/skeleton --w 640 --h 480</parameters>
+		<node>localhost</node>
+	</module>
+
+	<module>
+	  	<name>yarpview</name>
+	  	<parameters>--name /view/eyecontact --w 640 --h 480</parameters>
+	  	<node>localhost</node>
+	</module>
+
+<!-- Connections -->
+
+	<connection>
+		<from>/depthCamera/rgbImage:o</from>
+		<to>/view/rgb</to>
+		<protocol>mjpeg</protocol>
+	</connection>
+
+
+	<connection>
+		<from>/depthCamera/rgbImage:o</from>
+		<to>/yarpOpenPose/image:i</to>
+		<protocol>mjpeg</protocol>
+	</connection>
+
+	<connection>
+		<from>/yarpOpenPose/image:o</from>
+		<to>/view/skeleton</to>
+		<protocol>mjpeg</protocol>
+	</connection>
+
+	<connection>
+		<from>/depthCamera/rgbImage:o</from>
+		<to>/classifier/image:i</to>
+		<protocol>mjpeg</protocol>
+	</connection>
+
+	<connection>
+		<from>/yarpOpenPose/target:o</from>
+		<to>/classifier/data:i</to>
+	</connection>
+
+	<connection>
+		  	<from>/classifier/image:o</from>
+		  	<to>/view/eyecontact</to>
+		  	<protocol>mjpeg</protocol>
+	</connection>
+
+</application>
+
