@@ -1,17 +1,23 @@
 <application>
-<name>mutual gaze classifier</name>
+<name>mutual gaze classifier realsense</name>
 <version>1.0</version>
 
 <!-- Modules -->
 	<module>
+		<name>yarpdev</name>
+		<parameters>--from /home/docky/apps/conf/RealSense_conf.ini</parameters>
+		<node>localhost</node>
+	</module>
+
+	<module>
 		<name>yarpOpenPose</name>
-		<parameters></parameters>
+		<parameters> --from /home/docky/apps/conf/yarpOpenPose.ini</parameters>
 		<node>localhost</node>
 	</module>
 
 	<module>
 		<name>classifier.py</name>
-		<parameters></parameters>
+		<parameters>--from /home/docky/robotology-build/share/ICUBcontrib/contexts/mutual-gaze-classifier-demo/classifier_conf_initial.ini</parameters>
 		<deployer>python3.6</deployer>
 		<node>localhost</node>
 	</module>

@@ -58,16 +58,15 @@ RUN cd /projects/robotology-superbuild/build && \
     &&\
     make
 
-
+RUN apt-get install -y nano gedit
+RUN export PYTHONPATH=/projects/robotology-superbuild/build/src/YARP/lib/python3
 #### Clone repository installation ####
 ARG username
 ARG password
 
-RUN export PYTHONPATH=/projects/robotology-superbuild/build/src/YARP/lib/python3
-
 RUN cd /projects/ && \
     git clone https://${username}:${password}@github.com/MariaLombardi/mutual-gaze-classifier-demo.git
-
+RUN yarp namespace /root
 RUN cd /projects/mutual-gaze-classifier-demo && \
     mkdir build && cd build && \
     cmake .. \
@@ -76,3 +75,4 @@ RUN cd /projects/mutual-gaze-classifier-demo && \
     &&\
     make install
 
+ENV CUDA_VISIBLE_DEVICES=1
