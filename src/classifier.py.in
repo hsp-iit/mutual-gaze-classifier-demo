@@ -18,7 +18,8 @@ yarp.Network.init()
 class Classifier(yarp.RFModule):
 
     def configure(self, rf):
-        self.clf = pk.load(open('@import_path@' + '/model_svm.pkl', 'rb'))
+        self.model_name = rf.find("model_name").asString()  # to reset the buffer
+        self.clf = pk.load(open('@import_path@' + '/' + self.model_name, 'rb'))
         self.MAX_FRAMERATE = bool(distutils.util.strtobool((rf.find("max_framerate").asString())))
         self.threshold = rf.find("max_propagation").asInt32()  # to reset the buffer
         self.buffer = ('', (0, 0), 0, 0)  # centroid, prediction and level of confidence
