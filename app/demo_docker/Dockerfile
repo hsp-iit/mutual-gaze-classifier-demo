@@ -248,6 +248,7 @@ RUN cd /projects/human-sensing/yarpOpenPose &&\
     cmake .. &&\
     make && make install
 
+RUN apt-get install -y nano gedit
 #### Clone repository installation ####
 RUN cd /projects/ && \
     git clone https://github.com/MariaLombardi/mutual-gaze-classifier-demo.git
