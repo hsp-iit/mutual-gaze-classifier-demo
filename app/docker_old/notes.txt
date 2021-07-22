@@ -1,6 +1,0 @@
-
-- python3.6 -m pip install virtualenv
-- add python bindings to PYTHONPATH (.bashrc file): PYTHONPATH=$PYTHONPATH:/home/docky/yarp/build/lib/python
-- cambiare config file di yarpOpenPose (set path for the body models)
-
-- git clone mutual-gaze-classifier-demo
