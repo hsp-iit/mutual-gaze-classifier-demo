@@ -1,5 +1,5 @@
 <application>
-<name>mutual gaze classifier</name>
+<name>mutual gaze classifier R1</name>
 <version>1.0</version>
 
 <!-- Modules -->
@@ -11,7 +11,7 @@
 
 	<module>
 		<name>yarpOpenPose</name>
-		<parameters> --from /usr/local/share/ICUBcontrib/contexts/yarpOpenpose.ini</parameters>
+		<parameters> --from /usr/local/share/ICUBcontrib/mutual-gaze-classifier-demo/contexts/yarpOpenpose.ini</parameters>
 		<node>localhost</node>
 	</module>
 
