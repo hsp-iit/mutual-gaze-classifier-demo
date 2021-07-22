@@ -1,0 +1,7 @@
+docker build --build-arg "START_IMG=pytorch/pytorch:1.4-cuda10.1-cudnn7-devel" --build-arg "release=master" --build-arg "sbtag=Unstable" --build-arg username= --build-arg password= -t detection_python .
+
+
+nvidia-docker run --rm -it --privileged --gpus all -e QT_X11_NO_MITSHM=1 -e DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix -e NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics --hostname dockerpc --network=host  --pid=host detection_python
+
+cd /projects/online-detection-demo-temp/src
+OOSModule.py --online_segmentation true --from /projects/online-detection-demo-temp/app/config/oos_conf_segm.ini --max_training_images 300 --remove_hand_from_gt false --cfg_feature_task /projects/online-detection-demo-temp/external/python-online-detection/experiments/configs/config_feature_extraction_segmentation_ycbv_with_rpn_independent_trainings_demo.yaml --normalize_features_regressor_detector false
