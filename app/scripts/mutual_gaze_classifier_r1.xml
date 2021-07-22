@@ -4,20 +4,14 @@
 
 <!-- Modules -->
 	<module>
-		<name>yarpdev</name>
-		<parameters>--from /usr/local/src/robot/robots-configuration/R1SN003/sensors/RealSense_conf.ini</parameters>
-		<node>r1-torso</node>
-	</module>
-
-	<module>
 		<name>yarpOpenPose</name>
-		<parameters> --from /usr/local/share/ICUBcontrib/contexts/yarpOpenpose.ini</parameters>
+		<parameters></parameters>
 		<node>localhost</node>
 	</module>
 
 	<module>
 		<name>classifier.py</name>
-		<parameters>--from /usr/local/share/ICUBcontrib/contexts/mutual-gaze-classifier-demo/classifier_conf_final.ini</parameters>
+		<parameters></parameters>
 		<deployer>python3.6</deployer>
 		<node>localhost</node>
 	</module>
