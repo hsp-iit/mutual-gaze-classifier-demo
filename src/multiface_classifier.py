@@ -16,7 +16,8 @@ yarp.Network.init()
 class MultiFaceClassifier(yarp.RFModule):
 
     def configure(self, rf):
-        self.clf = pk.load(open('./functions/model_svm.pkl', 'rb'))
+        self.model_name = rf.find("model_name").asString()
+        self.clf = pk.load(open('./functions/' + self.model_name, 'rb'))
         self.MAX_FRAMERATE = bool(distutils.util.strtobool((rf.find("max_framerate").asString())))
         self.threshold = rf.find("max_propagation").asInt32()  # to reset the buffer
         self.buffer = yarp.Bottle()  # each element is ((0, 0), 0, 0) centroid, prediction and level of confidence
