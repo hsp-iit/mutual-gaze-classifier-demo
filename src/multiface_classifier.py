@@ -6,9 +6,9 @@ import sys
 import pickle as pk
 import distutils.util
 
-from config import IMAGE_HEIGHT, IMAGE_WIDTH, NUM_JOINTS
-from utilities import read_openpose_data, get_features
-from utilities import draw_on_img, get_human_idx, create_bottle
+from functions.config import IMAGE_HEIGHT, IMAGE_WIDTH, NUM_JOINTS
+from functions.utilities import read_openpose_data, get_features
+from functions.utilities import draw_on_img, get_human_idx, create_bottle
 
 
 yarp.Network.init()
@@ -16,7 +16,7 @@ yarp.Network.init()
 class MultiFaceClassifier(yarp.RFModule):
 
     def configure(self, rf):
-        self.clf = pk.load(open('model_svm.pkl', 'rb'))
+        self.clf = pk.load(open('./functions/model_svm.pkl', 'rb'))
         self.MAX_FRAMERATE = bool(distutils.util.strtobool((rf.find("max_framerate").asString())))
         self.threshold = rf.find("max_propagation").asInt32()  # to reset the buffer
         self.buffer = yarp.Bottle()  # each element is ((0, 0), 0, 0) centroid, prediction and level of confidence
@@ -220,7 +220,7 @@ if __name__ == '__main__':
     conffile = rf.find("from").asString()
     if not conffile:
         print('Using default conf file')
-        rf.setDefaultConfigFile('./config/classifier_conf.ini')
+        rf.setDefaultConfigFile('../app/config/classifier_conf.ini')
     else:
         rf.setDefaultConfigFile(rf.find("from").asString())
 
