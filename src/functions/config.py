@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 
 # image
 IMAGE_WIDTH = 640

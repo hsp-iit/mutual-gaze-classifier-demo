@@ -10,7 +10,7 @@ set(import_path "${CMAKE_CURRENT_SOURCE_DIR}/functions")
 
 
 if(NOT EXISTS ${import_path})
-	message(FATAL_ERROR "he python functions in utilitis and config are not in the expected folder.")
+	message(FATAL_ERROR "the python functions in utilitis and config are not in the expected folder.")
 endif()
 
 configure_file(classifier.py.in classifier.py @ONLY)

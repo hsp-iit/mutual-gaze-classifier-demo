@@ -8,7 +8,7 @@ import distutils.util
 
 from functions.config import IMAGE_HEIGHT, IMAGE_WIDTH, NUM_JOINTS
 from functions.utilities import read_openpose_data, get_features
-from functions.utilities import draw_on_img, get_human_idx, create_bottle
+from functions.utilities import draw_on_img, get_human_idx, create_bottle, get_mean_depth_over_area
 
 
 yarp.Network.init()
@@ -17,10 +17,10 @@ class MultiFaceClassifier(yarp.RFModule):
 
     def configure(self, rf):
         self.model_name = rf.find("model_name").asString()
-        self.clf = pk.load(open('./functions/' + self.model_name, 'rb'))
+        self.clf = pk.load(open('./src/functions/' + self.model_name, 'rb'))
         self.MAX_FRAMERATE = bool(distutils.util.strtobool((rf.find("max_framerate").asString())))
         self.threshold = rf.find("max_propagation").asInt32()  # to reset the buffer
-        self.buffer = yarp.Bottle()  # each element is ((0, 0), 0, 0) centroid, prediction and level of confidence
+        self.buffer = yarp.Bottle()  # each element is ((0, 0), 0, 0, 0) centroid, depth, prediction and level of confidence
         self.counter = 0  # counter for the threshold
         self.svm_buffer_size = 3
         self.svm_buffer = (np.array([], dtype=object)).tolist()
@@ -39,6 +39,16 @@ class MultiFaceClassifier(yarp.RFModule):
         self.in_buf_human_image.resize(IMAGE_WIDTH, IMAGE_HEIGHT)
         self.in_buf_human_image.setExternal(self.in_buf_human_array.data, self.in_buf_human_array.shape[1], self.in_buf_human_array.shape[0])
         print('{:s} opened'.format('/classifier/image:i'))
+
+        # input port for depth
+        self.in_port_human_depth = yarp.BufferedPortImageFloat()
+        self.in_port_human_depth_name = '/classifier/depth:i'
+        self.in_port_human_depth.open(self.in_port_human_depth_name)
+        self.in_buf_human_depth_array = np.ones((IMAGE_HEIGHT, IMAGE_WIDTH, 1), dtype=np.float32)
+        self.in_buf_human_depth = yarp.ImageFloat()
+        self.in_buf_human_depth.resize(IMAGE_WIDTH, IMAGE_HEIGHT)
+        self.in_buf_human_depth.setExternal(self.in_buf_human_depth_array.data, self.in_buf_human_depth_array.shape[1], self.in_buf_human_depth_array.shape[0])
+        print('{:s} opened'.format('/classifier/depth:i'))
 
         # input port for openpose data
         self.in_port_human_data = yarp.BufferedPortBottle()
@@ -60,6 +70,7 @@ class MultiFaceClassifier(yarp.RFModule):
         print('{:s} opened'.format('/classifier/image:o'))
 
         self.human_image = np.ones((IMAGE_HEIGHT, IMAGE_WIDTH, 3), dtype=np.uint8)
+        self.human_image_depth = np.ones((IMAGE_HEIGHT, IMAGE_WIDTH, 1), dtype=np.float32)
 
         return True
 
@@ -81,6 +92,7 @@ class MultiFaceClassifier(yarp.RFModule):
         print('Cleanup function')
         self.in_port_human_image.close()
         self.in_port_human_data.close()
+        self.in_port_human_depth.close()
         self.out_port_human_image.close()
         self.out_port_prediction.close()
         return True
@@ -89,6 +101,7 @@ class MultiFaceClassifier(yarp.RFModule):
         print('Interrupt function')
         self.in_port_human_image.close()
         self.in_port_human_data.close()
+        self.in_port_human_depth.close()
         self.out_port_human_image.close()
         self.out_port_prediction.close()
         return True
@@ -99,10 +112,18 @@ class MultiFaceClassifier(yarp.RFModule):
     def updateModule(self):
 
         received_image = self.in_port_human_image.read()
+        received_depth = self.in_port_human_depth.read(False)  # non blocking
 
         if received_image:
             self.in_buf_human_image.copy(received_image)
             human_image = np.copy(self.in_buf_human_array)
+
+            self.human_image = np.copy(human_image)
+            self.id_image = '%08d' % ((int(self.id_image) + 1) % 100000)
+
+            if received_depth:
+                self.in_buf_human_depth.copy(received_depth)
+                self.human_image_depth = np.copy(self.in_buf_human_depth_array)
 
             if self.MAX_FRAMERATE:
                 received_data = self.in_port_human_data.read(False)  # non blocking
@@ -157,7 +178,12 @@ class MultiFaceClassifier(yarp.RFModule):
                             y_winner = y_pred[0]
                             prob_mean = prob
 
-                        pred = create_bottle((self.id_image, (ld[itP,0], ld[itP,1]), y_winner, prob_mean))
+                        if self.human_image_depth is not None:
+                            depth = get_mean_depth_over_area(self.human_image_depth, [int(ld[itP, 0]), int(ld[itP, 1])], 20)
+                        else:
+                            depth = -1
+
+                        pred = create_bottle((self.id_image, (int(ld[itP,0]), int(ld[itP,1])), depth, y_winner, prob_mean))
                         output_pred_bottle.addList().read(pred)
                         human_image = draw_on_img(human_image, self.id_image, (ld[itP,0], ld[itP,1]), y_winner, prob_mean)
 
@@ -166,24 +192,32 @@ class MultiFaceClassifier(yarp.RFModule):
                     self.out_port_prediction.write(output_pred_bottle)
 
                     self.buffer.copy(output_pred_bottle)
-                    self.id_image = '%08d' % ((int(self.id_image) + 1) % 100000)
-                    self.human_image = np.copy(human_image)
                     self.counter = 0
                 else:
                     if self.MAX_FRAMERATE and (self.counter < self.threshold):
+                        output_pred_bottle = yarp.Bottle()
                         for i in range(0, self.buffer.size()):
                             buffer = self.buffer.get(i).asList()
                             centroid = buffer.get(1).asList()
-                            human_image = draw_on_img(human_image, buffer.get(0).asString(), (centroid.get(0).asDouble(), centroid.get(1).asDouble()), buffer.get(2).asInt(), buffer.get(3).asDouble())
+                            human_image = draw_on_img(human_image, self.id_image, (centroid.get(0).asDouble(), centroid.get(1).asDouble()), buffer.get(3).asInt(), buffer.get(4).asDouble())
+                            # change id_image in the buffer bottle
+                            pred = create_bottle((self.id_image, (centroid.get(0).asDouble(), centroid.get(1).asDouble()), buffer.get(2).asDouble(), buffer.get(3).asInt(), buffer.get(4).asDouble()))
+                            output_pred_bottle.addList().read(pred)
+
+                        self.buffer.copy(output_pred_bottle)
 
                         self.out_buf_human_array[:, :] = human_image
                         self.out_port_human_image.write(self.out_buf_human_image)
                         self.out_port_prediction.write(self.buffer)
-
                         self.counter = self.counter + 1
-                    # else:
-                    #     self.out_buf_human_array[:, :] = human_image
-                    #     self.out_port_human_image.write(self.out_buf_human_image)
+                    else:
+                        output_pred_bottle = yarp.Bottle()
+                        pred = create_bottle((self.id_image, (), -1, -1, -1))
+                        output_pred_bottle.addList().read(pred)
+
+                        self.out_buf_human_array[:, :] = human_image
+                        self.out_port_human_image.write(self.out_buf_human_image)
+                        self.out_port_prediction.write(output_pred_bottle)
 
                 for i in range(0, len(self.svm_buffer)):
                     if not (i in idx_humans_frame):
@@ -192,11 +226,17 @@ class MultiFaceClassifier(yarp.RFModule):
 
             else:
                 if self.MAX_FRAMERATE and (self.counter < self.threshold):
+                    output_pred_bottle = yarp.Bottle()
                     # send in output the buffer
                     for i in range(0, self.buffer.size()):
                         buffer = self.buffer.get(i).asList()
                         centroid = buffer.get(1).asList()
-                        human_image = draw_on_img(human_image, buffer.get(0).asString(), (centroid.get(0).asDouble(), centroid.get(1).asDouble()), buffer.get(2).asInt(), buffer.get(3).asDouble())
+                        human_image = draw_on_img(human_image, self.id_image, (centroid.get(0).asDouble(), centroid.get(1).asDouble()), buffer.get(3).asInt(), buffer.get(4).asDouble())
+                        # change id_image in the buffer bottle
+                        pred = create_bottle((self.id_image, (centroid.get(0).asDouble(), centroid.get(1).asDouble()), buffer.get(2).asDouble(), buffer.get(3).asInt(), buffer.get(4).asDouble()))
+                        output_pred_bottle.addList().read(pred)
+
+                    self.buffer.copy(output_pred_bottle)
 
                     # write rgb image
                     self.out_buf_human_array[:, :] = human_image
@@ -205,9 +245,14 @@ class MultiFaceClassifier(yarp.RFModule):
                     self.out_port_prediction.write(self.buffer)
                     self.counter = self.counter + 1
                 # else:
-                #     # send in output only the image without prediction
+                #     # send in output the image with prediction set to -1 (invalid value)
+                #     output_pred_bottle = yarp.Bottle()
+                #     pred = create_bottle((self.id_image, (), -1, -1, -1))
+                #     output_pred_bottle.addList().read(pred)
+                #
                 #     self.out_buf_human_array[:, :] = human_image
                 #     self.out_port_human_image.write(self.out_buf_human_image)
+                #     self.out_port_prediction.write(output_pred_bottle)
 
         return True
 
@@ -221,7 +266,7 @@ if __name__ == '__main__':
     conffile = rf.find("from").asString()
     if not conffile:
         print('Using default conf file')
-        rf.setDefaultConfigFile('../app/config/classifier_conf.ini')
+        rf.setDefaultConfigFile('./app/config/classifier_conf.ini')
     else:
         rf.setDefaultConfigFile(rf.find("from").asString())
 

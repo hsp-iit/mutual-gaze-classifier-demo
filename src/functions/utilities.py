@@ -3,7 +3,8 @@
 import numpy as np
 import yarp
 import cv2
-from config import JOINTS_POSE, JOINTS_FACE
+
+from .config import JOINTS_POSE, JOINTS_FACE, IMAGE_HEIGHT, IMAGE_WIDTH
 
 
 def compute_centroid(points):
@@ -173,14 +174,16 @@ def get_human_idx(buffer_output, centroid):
 def create_bottle(output):
     centroid = output[1]
     centroid_bottle = yarp.Bottle()
-    centroid_bottle.addDouble(centroid[0])
-    centroid_bottle.addDouble(centroid[1])
+    if centroid:
+        centroid_bottle.addDouble(centroid[0])
+        centroid_bottle.addDouble(centroid[1])
 
     output_bottle = yarp.Bottle()
     output_bottle.addString(output[0])
     output_bottle.addList().read(centroid_bottle)
-    output_bottle.addInt(int(output[2]))
-    output_bottle.addDouble(float(output[3]))
+    output_bottle.addDouble(float(output[2]))
+    output_bottle.addInt(int(output[3]))
+    output_bottle.addDouble(float(output[4]))
 
 
     return output_bottle
@@ -200,3 +203,26 @@ def draw_on_img(img, id, centroid, y_pred, prob):
     img = cv2.putText(img, 'c: %0.2f' % prob, tuple([int(centroid[0]), int(centroid[1]) - 90]), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2, cv2.LINE_AA)
 
     return img
+
+
+def get_mean_depth_over_area(image_depth, pixel, range):
+
+    vertical_range = np.zeros(2)
+    vertical_range[0] = pixel[1] - round(range/2) if pixel[1] - round(range/2) > 0 else 0
+    vertical_range[1] = pixel[1] + round(range/2) if pixel[1] + round(range/2) < IMAGE_HEIGHT else IMAGE_HEIGHT
+
+    horizontal_range = np.zeros(2)
+    horizontal_range[0] = pixel[0] - round(range/2) if pixel[0] - round(range/2) > 0 else 0
+    horizontal_range[1] = pixel[0] + round(range/2) if pixel[0] + round(range/2) < IMAGE_WIDTH else IMAGE_WIDTH
+
+    vertical_range = vertical_range.astype(int)
+    horizontal_range = horizontal_range.astype(int)
+
+    depth = []
+    for hpix in np.arange(horizontal_range[0], horizontal_range[1]):
+        for vpix in np.arange(vertical_range[0], vertical_range[1]):
+            depth.append(image_depth[vpix, hpix])
+
+    mean_depth = np.mean(depth)
+
+    return mean_depth

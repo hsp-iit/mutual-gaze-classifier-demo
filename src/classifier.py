@@ -5,10 +5,11 @@ import yarp
 import sys
 import pickle as pk
 import distutils.util
+import os
 
 from functions.config import IMAGE_HEIGHT, IMAGE_WIDTH, NUM_JOINTS
 from functions.utilities import read_openpose_data, get_features
-from functions.utilities import draw_on_img, create_bottle
+from functions.utilities import draw_on_img, create_bottle, get_mean_depth_over_area
 
 
 yarp.Network.init()
@@ -17,10 +18,10 @@ class Classifier(yarp.RFModule):
 
     def configure(self, rf):
         self.model_name = rf.find("model_name").asString()
-        self.clf = pk.load(open('./functions/' + self.model_name, 'rb'))
+        self.clf = pk.load(open('./src/functions/' + self.model_name, 'rb'))
         self.MAX_FRAMERATE = bool(distutils.util.strtobool((rf.find("max_framerate").asString())))
         self.threshold = rf.find("max_propagation").asInt32()  # to reset the buffer
-        self.buffer = ('', (0, 0), 0, 0)  # centroid, prediction and level of confidence
+        self.buffer = ('', (0, 0), 0, 0, 0)  # centroid, prediction and level of confidence
         self.counter = 0  # counter for the threshold
         self.svm_buffer_size = 3
         self.svm_buffer = []
@@ -39,6 +40,16 @@ class Classifier(yarp.RFModule):
         self.in_buf_human_image.resize(IMAGE_WIDTH, IMAGE_HEIGHT)
         self.in_buf_human_image.setExternal(self.in_buf_human_array.data, self.in_buf_human_array.shape[1], self.in_buf_human_array.shape[0])
         print('{:s} opened'.format('/classifier/image:i'))
+
+        # input port for depth
+        self.in_port_human_depth = yarp.BufferedPortImageFloat()
+        self.in_port_human_depth_name = '/classifier/depth:i'
+        self.in_port_human_depth.open(self.in_port_human_depth_name)
+        self.in_buf_human_depth_array = np.ones((IMAGE_HEIGHT, IMAGE_WIDTH, 1), dtype=np.float32)
+        self.in_buf_human_depth = yarp.ImageFloat()
+        self.in_buf_human_depth.resize(IMAGE_WIDTH, IMAGE_HEIGHT)
+        self.in_buf_human_depth.setExternal(self.in_buf_human_depth_array.data, self.in_buf_human_depth_array.shape[1], self.in_buf_human_depth_array.shape[0])
+        print('{:s} opened'.format('/classifier/depth:i'))
 
         # input port for openpose data
         self.in_port_human_data = yarp.BufferedPortBottle()
@@ -69,6 +80,7 @@ class Classifier(yarp.RFModule):
         print('{:s} opened'.format('/classifier/dump:o'))
 
         self.human_image = np.ones((IMAGE_HEIGHT, IMAGE_WIDTH, 3), dtype=np.uint8)
+        self.human_image_depth = np.ones((IMAGE_HEIGHT, IMAGE_WIDTH, 1), dtype=np.float32)
 
         return True
 
@@ -92,6 +104,7 @@ class Classifier(yarp.RFModule):
         print('Cleanup function')
         self.in_port_human_image.close()
         self.in_port_human_data.close()
+        self.in_port_human_depth.close()
         self.out_port_human_image.close()
         self.out_port_prediction.close()
         return True
@@ -100,6 +113,7 @@ class Classifier(yarp.RFModule):
         print('Interrupt function')
         self.in_port_human_image.close()
         self.in_port_human_data.close()
+        self.in_port_human_depth.close()
         self.out_port_human_image.close()
         self.out_port_prediction.close()
         return True
@@ -110,11 +124,18 @@ class Classifier(yarp.RFModule):
     def updateModule(self):
 
         received_image = self.in_port_human_image.read()
+        received_depth = self.in_port_human_depth.read(False) # non blocking
 
         if received_image:
-
             self.in_buf_human_image.copy(received_image)
             human_image = np.copy(self.in_buf_human_array)
+
+            self.human_image = np.copy(human_image)
+            self.id_image = '%08d' % ((int(self.id_image) + 1) % 100000)
+
+            if received_depth:
+                self.in_buf_human_depth.copy(received_depth)
+                self.human_image_depth = np.copy(self.in_buf_human_depth_array)
 
             if self.MAX_FRAMERATE:
                 received_data = self.in_port_human_data.read(False)  # non blocking
@@ -158,20 +179,24 @@ class Classifier(yarp.RFModule):
                             [self.svm_buffer[i][1] for i in range(0, len(self.svm_buffer)) if self.svm_buffer[i][0] == y_winner])
                         prob_mean = np.mean(prob_values)
 
-                    pred = create_bottle((self.id_image, (ld[itP,0], ld[itP,1]), y_winner, prob_mean))
+                    if self.human_image_depth is not None:
+                        depth = get_mean_depth_over_area(self.human_image_depth, [int(ld[itP,0]), int(ld[itP,1])], 30)
+                    else:
+                        depth = -1
+
+                    pred = create_bottle((self.id_image, (int(ld[itP,0]), int(ld[itP,1])), depth, y_winner, prob_mean))
                     human_image = draw_on_img(human_image, self.id_image, (ld[itP,0], ld[itP,1]), y_winner, prob_mean)
 
                     self.out_buf_human_array[:, :] = human_image
                     self.out_port_human_image.write(self.out_buf_human_image)
                     self.out_port_prediction.write(pred)
 
-                    self.buffer = (self.id_image, (ld[itP,0], ld[itP,1]), y_winner, prob_mean)
-                    self.human_image = np.copy(human_image)
-                    self.id_image = '%08d' % ((int(self.id_image) + 1) % 100000)
+                    self.buffer = (self.id_image, (int(ld[itP,0]), int(ld[itP,1])), depth, y_winner, prob_mean)
                     self.counter = 0
                 else:
                     if self.MAX_FRAMERATE and (self.counter < self.threshold):
-                        human_image = draw_on_img(human_image, self.buffer[0], self.buffer[1], self.buffer[2], self.buffer[3])
+                        self.buffer = (self.id_image, self.buffer[1], self.buffer[2], self.buffer[3], self.buffer[4])
+                        human_image = draw_on_img(human_image, self.buffer[0], self.buffer[1], self.buffer[3], self.buffer[4])
                         pred = create_bottle(self.buffer)
 
                         self.out_buf_human_array[:, :] = human_image
@@ -179,13 +204,18 @@ class Classifier(yarp.RFModule):
                         self.out_port_prediction.write(pred)
 
                         self.counter = self.counter + 1
-                    # else:
-                    #     self.out_buf_human_array[:, :] = human_image
-                    #     self.out_port_human_image.write(self.out_buf_human_image)
+                    else:
+                        pred = create_bottle((self.id_image, (), -1, -1, -1))
+
+                        # send in output only the image with prediction set to -1 (invalid value)
+                        self.out_buf_human_array[:, :] = human_image
+                        self.out_port_human_image.write(self.out_buf_human_image)
+                        self.out_port_prediction.write(pred)
             else:
                 if self.MAX_FRAMERATE and (self.counter < self.threshold):
                     # send in output the buffer
-                    human_image = draw_on_img(human_image, self.buffer[0], self.buffer[1], self.buffer[2], self.buffer[3])
+                    self.buffer = (self.id_image, self.buffer[1], self.buffer[2], self.buffer[3], self.buffer[4])
+                    human_image = draw_on_img(human_image, self.buffer[0], self.buffer[1], self.buffer[3], self.buffer[4])
                     pred = create_bottle(self.buffer)
 
                     # write rgb image
@@ -194,10 +224,13 @@ class Classifier(yarp.RFModule):
                     self.out_port_prediction.write(pred)
 
                     self.counter = self.counter + 1
-                # else:
-                #     # send in output only the image without prediction
-                #     self.out_buf_human_array[:, :] = human_image
-                #     self.out_port_human_image.write(self.out_buf_human_image)
+                #else:
+                    #pred = create_bottle((self.id_image, (), -1, -1, -1))
+
+                    # send in output the image with prediction set to -1 (invalid value)
+                    #self.out_buf_human_array[:, :] = human_image
+                    #self.out_port_human_image.write(self.out_buf_human_image)
+                    #self.out_port_prediction.write(pred)
 
         return True
 
@@ -208,10 +241,12 @@ if __name__ == '__main__':
     rf.setVerbose(True)
     rf.setDefaultContext("Classifier")
 
+    print(os.getcwd())
+
     conffile = rf.find("from").asString()
     if not conffile:
         print('Using default conf file')
-        rf.setDefaultConfigFile('../app/config/classifier_conf.ini')
+        rf.setDefaultConfigFile('./app/config/classifier_conf.ini')
     else:
         rf.setDefaultConfigFile(rf.find("from").asString())
 
