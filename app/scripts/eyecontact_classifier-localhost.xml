@@ -1,24 +1,18 @@
 <application>
-<name>mutual gaze classifier R1</name>
+<name>mutual gaze classifier</name>
 <version>1.0</version>
 
 <!-- Modules -->
-	<module>
-		<name>yarpdev</name>
-		<parameters>--from /usr/local/src/robot/robots-configuration/R1SN003/sensors/RealSense_conf.ini</parameters>
-		<node>r1-torso</node>
-	</module>
 
 	<module>
 		<name>yarpOpenPose</name>
-		<parameters> --from /usr/local/share/ICUBcontrib/contexts/mutual-gaze-classifier-demo/yarpOpenpose.ini</parameters>
+		<parameters></parameters>
 		<node>localhost</node>
 	</module>
 
 	<module>
-		<name>classifier.py</name>
-		<parameters>--from /usr/local/share/ICUBcontrib/contexts/mutual-gaze-classifier-demo/classifier_conf_final.ini</parameters>
-		<deployer>python3.6</deployer>
+		<name>yarpdev</name>
+		<parameters>--from /home/marialombardi/Workspace/yarpApps/RealSense_conf.ini</parameters>
 		<node>localhost</node>
 	</module>
 
@@ -35,10 +29,11 @@
 	</module>
 
 	<module>
-	  	<name>yarpview</name>
-	  	<parameters>--name /view/eyecontact --w 640 --h 480</parameters>
-	  	<node>localhost</node>
+	      	<name>yarpview</name>
+	      	<parameters>--name /view/eyecontact --w 640 --h 480</parameters>
+	      	<node>localhost</node>
 	</module>
+
 
 <!-- Connections -->
 
@@ -47,7 +42,6 @@
 		<to>/view/rgb</to>
 		<protocol>mjpeg</protocol>
 	</connection>
-
 
 	<connection>
 		<from>/depthCamera/rgbImage:o</from>
@@ -60,7 +54,7 @@
 		<to>/view/skeleton</to>
 		<protocol>mjpeg</protocol>
 	</connection>
-
+	
 	<connection>
 		<from>/depthCamera/rgbImage:o</from>
 		<to>/classifier/image:i</to>
@@ -73,9 +67,15 @@
 	</connection>
 
 	<connection>
-		  	<from>/classifier/image:o</from>
-		  	<to>/view/eyecontact</to>
-		  	<protocol>mjpeg</protocol>
+	      	<from>/depthCamera/depthImage:o</from>
+	      	<to>/classifier/depth:i</to>
+	      	<protocol>fast_tcp</protocol>
+	</connection>
+
+	<connection>
+	      	<from>/classifier/image:o</from>
+	      	<to>/view/eyecontact</to>
+	      	<protocol>mjpeg</protocol>
 	</connection>
 
 </application>

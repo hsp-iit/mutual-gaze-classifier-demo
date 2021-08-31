@@ -73,9 +73,9 @@
 	</connection>
 
 	<connection>
-		  	<from>/classifier/image:o</from>
-		  	<to>/view/eyecontact</to>
-		  	<protocol>mjpeg</protocol>
+	  	<from>/classifier/image:o</from>
+	  	<to>/view/eyecontact</to>
+	  	<protocol>mjpeg</protocol>
 	</connection>
 
 </application>
