@@ -4,7 +4,7 @@ import numpy as np
 import yarp
 import cv2
 
-from .config import JOINTS_POSE, JOINTS_FACE, IMAGE_HEIGHT, IMAGE_WIDTH
+from config import JOINTS_POSE, JOINTS_FACE, IMAGE_HEIGHT, IMAGE_WIDTH
 
 
 def compute_centroid(points):

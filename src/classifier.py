@@ -240,15 +240,7 @@ if __name__ == '__main__':
     rf = yarp.ResourceFinder()
     rf.setVerbose(True)
     rf.setDefaultContext("Classifier")
-
-    print(os.getcwd())
-
-    conffile = rf.find("from").asString()
-    if not conffile:
-        print('Using default conf file')
-        rf.setDefaultConfigFile('./app/config/classifier_conf.ini')
-    else:
-        rf.setDefaultConfigFile(rf.find("from").asString())
+    rf.setDefaultConfigFile('./app/config/classifier_conf.ini')
 
     rf.configure(sys.argv)
 
