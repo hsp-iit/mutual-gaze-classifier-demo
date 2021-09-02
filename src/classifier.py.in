@@ -5,6 +5,7 @@ import yarp
 import sys
 import pickle as pk
 import distutils.util
+import cv2
 
 sys.path.append('@import_path@')
 
@@ -19,9 +20,12 @@ class Classifier(yarp.RFModule):
 
     def configure(self, rf):
         self.model_name = rf.find("model_name").asString()
+        print('SVM model file: %s' % self.model_name)
         self.clf = pk.load(open('@import_path@' + '/' + self.model_name, 'rb'))
         self.MAX_FRAMERATE = bool(distutils.util.strtobool((rf.find("max_framerate").asString())))
+        print('Max framerate: %s' % str(self.MAX_FRAMERATE))
         self.threshold = rf.find("max_propagation").asInt32()  # to reset the buffer
+        print('SVM Buffer threshold: %d' % self.threshold)
         self.buffer = ('', (0, 0), 0, 0, 0)  # centroid, prediction and level of confidence
         self.counter = 0  # counter for the threshold
         self.svm_buffer_size = 3
@@ -195,28 +199,27 @@ class Classifier(yarp.RFModule):
                     self.buffer = (self.id_image, (int(ld[itP,0]), int(ld[itP,1])), depth, y_winner, prob_mean)
                     self.counter = 0
                 else:
-                    if self.MAX_FRAMERATE and (self.counter < self.threshold):
-                        self.buffer = (self.id_image, self.buffer[1], self.buffer[2], self.buffer[3], self.buffer[4])
-                        human_image = draw_on_img(human_image, self.buffer[0], self.buffer[1], self.buffer[3], self.buffer[4])
-                        pred = create_bottle(self.buffer)
+                    pred = create_bottle((self.id_image, (), -1, -1, -1))
+                    human_image = cv2.putText(human_image, 'id: ' + str(self.id_image), tuple([25, 30]), cv2.FONT_HERSHEY_SIMPLEX,
+                                              0.6, (0, 0, 255), 2, cv2.LINE_AA)
 
-                        self.out_buf_human_array[:, :] = human_image
-                        self.out_port_human_image.write(self.out_buf_human_image)
-                        self.out_port_prediction.write(pred)
+                    # send in output only the image with prediction set to -1 (invalid value)
+                    self.out_buf_human_array[:, :] = human_image
+                    self.out_port_human_image.write(self.out_buf_human_image)
+                    self.out_port_prediction.write(pred)
 
-                        self.counter = self.counter + 1
-                    else:
-                        pred = create_bottle((self.id_image, (), -1, -1, -1))
-
-                        # send in output only the image with prediction set to -1 (invalid value)
-                        self.out_buf_human_array[:, :] = human_image
-                        self.out_port_human_image.write(self.out_buf_human_image)
-                        self.out_port_prediction.write(pred)
+                    self.buffer = (self.id_image, (), -1, -1, -1)
+                    self.counter = 0
             else:
                 if self.MAX_FRAMERATE and (self.counter < self.threshold):
                     # send in output the buffer
                     self.buffer = (self.id_image, self.buffer[1], self.buffer[2], self.buffer[3], self.buffer[4])
-                    human_image = draw_on_img(human_image, self.buffer[0], self.buffer[1], self.buffer[3], self.buffer[4])
+                    if self.buffer[1]:
+                        human_image = draw_on_img(human_image, self.buffer[0], self.buffer[1], self.buffer[3], self.buffer[4])
+                    else:
+                        human_image = cv2.putText(human_image, 'id: ' + str(self.id_image), tuple([25, 30]),
+                                                  cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2, cv2.LINE_AA)
+
                     pred = create_bottle(self.buffer)
 
                     # write rgb image
@@ -225,13 +228,6 @@ class Classifier(yarp.RFModule):
                     self.out_port_prediction.write(pred)
 
                     self.counter = self.counter + 1
-                # else:
-                # pred = create_bottle((self.id_image, (), -1, -1, -1))
-
-                # send in output the image with prediction set to -1 (invalid value)
-                # self.out_buf_human_array[:, :] = human_image
-                # self.out_port_human_image.write(self.out_buf_human_image)
-                # self.out_port_prediction.write(pred)
 
         return True
 

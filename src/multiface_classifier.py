@@ -5,6 +5,7 @@ import yarp
 import sys
 import pickle as pk
 import distutils.util
+import cv2
 
 from functions.config import IMAGE_HEIGHT, IMAGE_WIDTH, NUM_JOINTS
 from functions.utilities import read_openpose_data, get_features
@@ -17,9 +18,12 @@ class MultiFaceClassifier(yarp.RFModule):
 
     def configure(self, rf):
         self.model_name = rf.find("model_name").asString()
+        print('SVM model file: %s' % self.model_name)
         self.clf = pk.load(open('./src/functions/' + self.model_name, 'rb'))
         self.MAX_FRAMERATE = bool(distutils.util.strtobool((rf.find("max_framerate").asString())))
+        print('Max framerate: %s' % str(self.MAX_FRAMERATE))
         self.threshold = rf.find("max_propagation").asInt32()  # to reset the buffer
+        print('SVM Buffer threshold: %d' % self.threshold)
         self.buffer = yarp.Bottle()  # each element is ((0, 0), 0, 0, 0) centroid, depth, prediction and level of confidence
         self.counter = 0  # counter for the threshold
         self.svm_buffer_size = 3
@@ -154,7 +158,7 @@ class MultiFaceClassifier(yarp.RFModule):
                         y_pred = (np.where(y_classes[itP] == prob))[0]
 
                         min_dist, idx = get_human_idx(self.svm_buffer, ld[itP, 0:2])
-                        if (idx != None and min_dist != None) and ((len(self.svm_buffer) == y_classes.shape[0]) or (min_dist < 100)): # suppose min dist < 50 frames
+                        if (idx != None and min_dist != None) and ((len(self.svm_buffer) == y_classes.shape[0]) or (min_dist < 50)): # suppose min dist < 50 pixels
                             idx_humans_frame.append(idx)
                             if len(self.svm_buffer[idx]) == 3:
                                 self.svm_buffer[idx].pop(0)
@@ -173,7 +177,7 @@ class MultiFaceClassifier(yarp.RFModule):
 
                         else:
                             self.svm_buffer.append([[ld[itP, 0], ld[itP, 1], y_pred[0], prob]])
-                            print("add humans to the scene: %d" % len(self.svm_buffer))
+                            print("num of humans in the scene: %d" % len(self.svm_buffer))
                             idx_humans_frame.append(len(self.svm_buffer)-1)
                             y_winner = y_pred[0]
                             prob_mean = prob
@@ -194,46 +198,41 @@ class MultiFaceClassifier(yarp.RFModule):
                     self.buffer.copy(output_pred_bottle)
                     self.counter = 0
                 else:
-                    if self.MAX_FRAMERATE and (self.counter < self.threshold):
-                        output_pred_bottle = yarp.Bottle()
-                        for i in range(0, self.buffer.size()):
-                            buffer = self.buffer.get(i).asList()
-                            centroid = buffer.get(1).asList()
-                            human_image = draw_on_img(human_image, self.id_image, (centroid.get(0).asDouble(), centroid.get(1).asDouble()), buffer.get(3).asInt(), buffer.get(4).asDouble())
-                            # change id_image in the buffer bottle
-                            pred = create_bottle((self.id_image, (centroid.get(0).asDouble(), centroid.get(1).asDouble()), buffer.get(2).asDouble(), buffer.get(3).asInt(), buffer.get(4).asDouble()))
-                            output_pred_bottle.addList().read(pred)
+                    # no humans in the scene
+                    output_pred_bottle = yarp.Bottle()
+                    pred = create_bottle((self.id_image, (), -1, -1, -1))
+                    output_pred_bottle.addList().read(pred)
+                    # print only the self.id_image
+                    human_image = cv2.putText(human_image, 'id: ' + str(self.id_image), tuple([25, 30]), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2, cv2.LINE_AA)
 
-                        self.buffer.copy(output_pred_bottle)
+                    self.out_buf_human_array[:, :] = human_image
+                    self.out_port_human_image.write(self.out_buf_human_image)
+                    self.out_port_prediction.write(output_pred_bottle)
 
-                        self.out_buf_human_array[:, :] = human_image
-                        self.out_port_human_image.write(self.out_buf_human_image)
-                        self.out_port_prediction.write(self.buffer)
-                        self.counter = self.counter + 1
-                    else:
-                        output_pred_bottle = yarp.Bottle()
-                        pred = create_bottle((self.id_image, (), -1, -1, -1))
-                        output_pred_bottle.addList().read(pred)
+                    self.buffer.copy(output_pred_bottle)
+                    self.counter = 0
 
-                        self.out_buf_human_array[:, :] = human_image
-                        self.out_port_human_image.write(self.out_buf_human_image)
-                        self.out_port_prediction.write(output_pred_bottle)
-
-                for i in range(0, len(self.svm_buffer)):
+                for i in reversed(range(len(self.svm_buffer))):
                     if not (i in idx_humans_frame):
                         self.svm_buffer.pop(i)
-                        print("remove humans in the scene: %d" % len(self.svm_buffer))
+                        print("num of humans in the scene: %d" % len(self.svm_buffer))
 
             else:
+                # branch to increase the framerate, received_data is None
                 if self.MAX_FRAMERATE and (self.counter < self.threshold):
                     output_pred_bottle = yarp.Bottle()
                     # send in output the buffer
                     for i in range(0, self.buffer.size()):
                         buffer = self.buffer.get(i).asList()
                         centroid = buffer.get(1).asList()
-                        human_image = draw_on_img(human_image, self.id_image, (centroid.get(0).asDouble(), centroid.get(1).asDouble()), buffer.get(3).asInt(), buffer.get(4).asDouble())
                         # change id_image in the buffer bottle
-                        pred = create_bottle((self.id_image, (centroid.get(0).asDouble(), centroid.get(1).asDouble()), buffer.get(2).asDouble(), buffer.get(3).asInt(), buffer.get(4).asDouble()))
+                        if centroid.size() != 0:
+                            human_image = draw_on_img(human_image, self.id_image, (centroid.get(0).asInt(), centroid.get(1).asInt()), buffer.get(3).asInt(), buffer.get(4).asDouble())
+                            pred = create_bottle((self.id_image, (centroid.get(0).asInt(), centroid.get(1).asInt()), buffer.get(2).asDouble(), buffer.get(3).asInt(), buffer.get(4).asDouble()))
+                        else:
+                            human_image = cv2.putText(human_image, 'id: ' + str(self.id_image), tuple([25, 30]), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2, cv2.LINE_AA)
+                            pred = create_bottle((self.id_image, (), buffer.get(2).asDouble(), buffer.get(3).asInt(), buffer.get(4).asDouble()))
+
                         output_pred_bottle.addList().read(pred)
 
                     self.buffer.copy(output_pred_bottle)
@@ -244,15 +243,6 @@ class MultiFaceClassifier(yarp.RFModule):
                     # write prediction bottle
                     self.out_port_prediction.write(self.buffer)
                     self.counter = self.counter + 1
-                # else:
-                #     # send in output the image with prediction set to -1 (invalid value)
-                #     output_pred_bottle = yarp.Bottle()
-                #     pred = create_bottle((self.id_image, (), -1, -1, -1))
-                #     output_pred_bottle.addList().read(pred)
-                #
-                #     self.out_buf_human_array[:, :] = human_image
-                #     self.out_port_human_image.write(self.out_buf_human_image)
-                #     self.out_port_prediction.write(output_pred_bottle)
 
         return True
 

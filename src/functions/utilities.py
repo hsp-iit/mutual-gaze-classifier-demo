@@ -4,12 +4,21 @@ import numpy as np
 import yarp
 import cv2
 
-from config import JOINTS_POSE, JOINTS_FACE, IMAGE_HEIGHT, IMAGE_WIDTH
+from .config import JOINTS_POSE, JOINTS_FACE, IMAGE_HEIGHT, IMAGE_WIDTH
 
 
 def compute_centroid(points):
     mean_x = np.mean([p[0] for p in points])
     mean_y = np.mean([p[1] for p in points])
+
+    if mean_x > IMAGE_WIDTH:
+        mean_x = IMAGE_WIDTH
+    if mean_x < 0:
+        mean_x = 0
+    if mean_y > IMAGE_HEIGHT:
+        mean_y = IMAGE_HEIGHT
+    if mean_y < 0:
+        mean_y = 0
 
     return [mean_x, mean_y]
 
@@ -175,8 +184,8 @@ def create_bottle(output):
     centroid = output[1]
     centroid_bottle = yarp.Bottle()
     if centroid:
-        centroid_bottle.addDouble(centroid[0])
-        centroid_bottle.addDouble(centroid[1])
+        centroid_bottle.addInt(int(centroid[0]))
+        centroid_bottle.addInt(int(centroid[1]))
 
     output_bottle = yarp.Bottle()
     output_bottle.addString(output[0])
@@ -199,6 +208,7 @@ def draw_on_img(img, id, centroid, y_pred, prob):
     else:
         txt = 'EC YES'
 
+    img = cv2.circle(img, tuple([int(centroid[0]), int(centroid[1])]), 10, (0, 0, 255), -1)
     img = cv2.putText(img, txt, tuple([int(centroid[0]), int(centroid[1])-120]), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2, cv2.LINE_AA)
     img = cv2.putText(img, 'c: %0.2f' % prob, tuple([int(centroid[0]), int(centroid[1]) - 90]), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2, cv2.LINE_AA)
 
