@@ -24,7 +24,7 @@ def compute_centroid(points):
 
 
 def joint_set(p, c):
-    return (p[0] != 0.0 or p[1] != 0.0) and c > 0.1
+    return (p[0] != 0.0 or p[1] != 0.0) and c > 0.0
 
 
 def dist_2d(p1, p2):
@@ -208,7 +208,7 @@ def draw_on_img(img, id, centroid, y_pred, prob):
     else:
         txt = 'EC YES'
 
-    img = cv2.circle(img, tuple([int(centroid[0]), int(centroid[1])]), 10, (0, 0, 255), -1)
+    img = cv2.circle(img, tuple([int(centroid[0]), int(centroid[1])]), 6, (0, 0, 255), -1)
     img = cv2.putText(img, txt, tuple([int(centroid[0]), int(centroid[1])-120]), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2, cv2.LINE_AA)
     img = cv2.putText(img, 'c: %0.2f' % prob, tuple([int(centroid[0]), int(centroid[1]) - 90]), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2, cv2.LINE_AA)
 
