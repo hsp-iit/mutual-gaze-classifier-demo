@@ -128,4 +128,4 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
-/classifier_module.mp4
+classifier_module.mp4

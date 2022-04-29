@@ -2,8 +2,6 @@
 ARG START_IMG="none"
 FROM $START_IMG
 
-#LABEL maintainer="alexandre.gomespereira@iit.it, vadim.tikhanoff@iit.it, elisa.maiettini@iit.it" 
-
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Install dependencies given in documentation in superbuild
@@ -54,7 +52,7 @@ RUN mkdir -p /etc/bash_completion.d/ &&\
         qml-module-qt-labs-folderlistmodel \
         qml-module-qt-labs-settings 
 
-#In order to insytall cmake 12.0 required by superbuild
+#In order to install cmake 12.0 required by superbuild
 RUN apt-get install -y apt-transport-https ca-certificates gnupg software-properties-common wget &&\
     wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | apt-key add - &&\
     apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main' &&\
@@ -193,16 +191,19 @@ RUN apt-get update && apt-get install -y \
         python3-distutils \
         python3-setuptools
 
-RUN python3.6 -m pip install pip==21.1.3
 RUN apt-get update
 
 #### Install python packages ####
+RUN python3.6 -m pip install --upgrade pip
 RUN python3.6 -m pip install --upgrade setuptools
-RUN python3.6 -m pip install numpy==1.19.5 
-RUN python3.6 -m pip install opencv-contrib-python==4.5.2.54
-RUN python3.6 -m pip install pandas==1.1.5
-RUN python3.6 -m pip install wheel==0.36.2
-RUN python3.6 -m pip install scikit-learn==0.24.1
+RUN python3.6 -m pip install numpy
+RUN python3.6 -m pip install opencv-contrib-python
+RUN python3.6 -m pip install pandas
+RUN python3.6 -m pip install wheel
+RUN python3.6 -m pip install scikit-learn
+RUN python3.6 -m pip install keras
+RUN python3.6 -m pip install tensorflow
+RUN python3.6 -m pip install pynput
 
 #### Dependencies ####
 RUN apt-get install -y libgoogle-glog-dev libboost-all-dev libhdf5-serial-dev libatlas-base-dev
@@ -235,9 +236,10 @@ RUN  apt-get -y install protobuf-compiler
 RUN cd /projects/openpose &&\
     mkdir build
 RUN cd /projects/openpose/build &&\
-    cmake .. -DCUDA_ARCH=Manual -DCUDA_ARCH_BIN=75 -DCUDA_ARCH_PTX=75
+    cmake .. -DDOWNLOAD_HAND_MODEL=OFF
+#    cmake .. -DDOWNLOAD_HAND_MODEL=OFF -DCUDA_ARCH=Manual -DCUDA_ARCH_BIN=75 -DCUDA_ARCH_PTX=75
 RUN cd /projects/openpose/build &&\ 
-    make &&\
+    make -j$(nproc) &&\
     make install
 
 # compile and install yarpOpenPose
@@ -248,7 +250,6 @@ RUN cd /projects/human-sensing/yarpOpenPose &&\
     cmake .. &&\
     make && make install
 
-RUN apt-get install -y nano gedit
 #### Clone repository installation ####
 RUN cd /projects/ && \
     git clone https://github.com/MariaLombardi/mutual-gaze-classifier-demo.git
@@ -258,6 +259,7 @@ RUN cd /projects/mutual-gaze-classifier-demo && \
     &&\
     make \
     &&\
-    make install
+    make install \
+
 RUN yarp namespace /cer04
 RUN yarp conf 192.168.100.10 10000
