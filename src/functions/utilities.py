@@ -46,13 +46,15 @@ def compute_head_face_features(pose, conf_pose, face, conf_face):
     centroid = compute_centroid(n_joints_set)
     max_dist = max([dist_2d(j, centroid) for j in n_joints_set])
 
+    if max_dist == 0:
+        return None, None
+
     new_repr_pose = [(np.array(pose[joint]) - np.array(centroid)) for joint in JOINTS_POSE]
-    new_repr_face = ([(np.array(face[joint]) - np.array(centroid)) for joint in JOINTS_FACE])
+    new_repr_face = [(np.array(face[joint]) - np.array(centroid)) for joint in JOINTS_FACE]
 
     result = []
 
     for i in range(0, len(JOINTS_POSE)):
-
         if joint_set(pose[JOINTS_POSE[i]], conf_pose[JOINTS_POSE[i]]):
             result.append([new_repr_pose[i][0] / max_dist, new_repr_pose[i][1] / max_dist])
         else:
@@ -152,8 +154,9 @@ def read_openpose_data(received_data):
                             body_part = [part.get(1).asDouble(), part.get(2).asDouble(), part.get(3).asDouble()]
                             body_person.append(body_part)
 
-                if body_person and face_person:
+                if body_person:
                     body.append(body_person)
+                if face_person:
                     face.append(face_person)
 
     poses, conf_poses = load_many_poses(body)
