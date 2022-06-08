@@ -207,7 +207,7 @@ class MultiFaceClassifier(yarp.RFModule):
                     self.out_port_human_image.write(self.out_buf_human_image)
                     self.out_port_prediction.write(output_pred_bottle)
                     # propag received image
-                    self.out_buf_propag_array[:, :] = received_image
+                    self.out_buf_propag_array[:, :] = self.human_image
                     self.out_port_propag_image.write(self.out_buf_propag_image)
 
                     self.buffer.copy(output_pred_bottle)
@@ -224,7 +224,7 @@ class MultiFaceClassifier(yarp.RFModule):
                     self.out_port_human_image.write(self.out_buf_human_image)
                     self.out_port_prediction.write(output_pred_bottle)
                     # propag received image
-                    self.out_buf_propag_array[:, :] = received_image
+                    self.out_buf_propag_array[:, :] = self.human_image
                     self.out_port_propag_image.write(self.out_buf_propag_image)
 
                     self.buffer.copy(output_pred_bottle)
@@ -261,7 +261,7 @@ class MultiFaceClassifier(yarp.RFModule):
                     # write prediction bottle
                     self.out_port_prediction.write(self.buffer)
                     # propag received image
-                    self.out_buf_propag_array[:, :] = received_image
+                    self.out_buf_propag_array[:, :] = self.human_image
                     self.out_port_propag_image.write(self.out_buf_propag_image)
 
                     self.counter = self.counter + 1

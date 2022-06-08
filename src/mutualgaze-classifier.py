@@ -206,7 +206,7 @@ class MutualGazeClassifier(yarp.RFModule):
                     self.out_port_human_image.write(self.out_buf_human_image)
                     self.out_port_prediction.write(pred)
                     # propag received image
-                    self.out_buf_propag_array[:, :] = received_image
+                    self.out_buf_propag_array[:, :] = self.human_image
                     self.out_port_propag_image.write(self.out_buf_propag_image)
 
                     self.buffer = (self.id_image, (int(ld[itP,0]), int(ld[itP,1])), depth, y_winner, prob_mean)
@@ -220,7 +220,7 @@ class MutualGazeClassifier(yarp.RFModule):
                     self.out_port_human_image.write(self.out_buf_human_image)
                     self.out_port_prediction.write(pred)
                     # propag received image
-                    self.out_buf_propag_array[:, :] = received_image
+                    self.out_buf_propag_array[:, :] = self.human_image
                     self.out_port_propag_image.write(self.out_buf_propag_image)
 
                     self.buffer = (self.id_image, (), -1, -1, -1)
@@ -241,7 +241,7 @@ class MutualGazeClassifier(yarp.RFModule):
                     self.out_port_human_image.write(self.out_buf_human_image)
                     self.out_port_prediction.write(pred)
                     # propag received image
-                    self.out_buf_propag_array[:, :] = received_image
+                    self.out_buf_propag_array[:, :] = self.human_image
                     self.out_port_propag_image.write(self.out_buf_propag_image)
 
                     self.counter = self.counter + 1
