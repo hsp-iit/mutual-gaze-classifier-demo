@@ -75,6 +75,16 @@ class MultiFaceClassifier(yarp.RFModule):
         self.out_buf_human_image.setExternal(self.out_buf_human_array.data, self.out_buf_human_array.shape[1], self.out_buf_human_array.shape[0])
         print('{:s} opened'.format('/mutualgaze/image:o'))
 
+        # propag input image
+        self.out_port_propag_image = yarp.Port()
+        self.out_port_propag_image.open('/mutualgaze/propag:o')
+        self.out_buf_propag_array = np.ones((IMAGE_HEIGHT, IMAGE_WIDTH, 3), dtype=np.uint8)
+        self.out_buf_propag_image = yarp.ImageRgb()
+        self.out_buf_propag_image.resize(IMAGE_WIDTH, IMAGE_HEIGHT)
+        self.out_buf_propag_image.setExternal(self.out_buf_propag_array.data, self.out_buf_propag_array.shape[1],
+                                              self.out_buf_propag_array.shape[0])
+        print('{:s} opened'.format('/mutualgaze/propag:o'))
+
         self.human_image = np.ones((IMAGE_HEIGHT, IMAGE_WIDTH, 3), dtype=np.uint8)
         self.human_image_depth = np.ones((IMAGE_HEIGHT, IMAGE_WIDTH, 1), dtype=np.float32)
 
@@ -100,6 +110,7 @@ class MultiFaceClassifier(yarp.RFModule):
         self.in_port_human_data.close()
         self.in_port_human_depth.close()
         self.out_port_human_image.close()
+        self.out_port_propag_image.close()
         self.out_port_prediction.close()
         return True
 
@@ -109,6 +120,7 @@ class MultiFaceClassifier(yarp.RFModule):
         self.in_port_human_data.close()
         self.in_port_human_depth.close()
         self.out_port_human_image.close()
+        self.out_port_propag_image.close()
         self.out_port_prediction.close()
         return True
 
@@ -169,7 +181,7 @@ class MultiFaceClassifier(yarp.RFModule):
 
                             count_class_0 = [(self.svm_buffer[idx])[i][2] for i in range(0, len(self.svm_buffer[idx]))].count(0)
                             count_class_1 = [(self.svm_buffer[idx])[i][2] for i in range(0, len(self.svm_buffer[idx]))].count(1)
-                            if (count_class_1 == count_class_0):
+                            if count_class_1 == count_class_0:
                                 y_winner = y_pred[0]
                                 prob_mean = prob
                             else:
@@ -196,6 +208,9 @@ class MultiFaceClassifier(yarp.RFModule):
                     self.out_buf_human_array[:, :] = human_image
                     self.out_port_human_image.write(self.out_buf_human_image)
                     self.out_port_prediction.write(output_pred_bottle)
+                    # propag received image
+                    self.out_buf_propag_array[:, :] = received_image
+                    self.out_port_propag_image.write(self.out_buf_propag_image)
 
                     self.buffer.copy(output_pred_bottle)
                     self.counter = 0
@@ -210,6 +225,9 @@ class MultiFaceClassifier(yarp.RFModule):
                     self.out_buf_human_array[:, :] = human_image
                     self.out_port_human_image.write(self.out_buf_human_image)
                     self.out_port_prediction.write(output_pred_bottle)
+                    # propag received image
+                    self.out_buf_propag_array[:, :] = received_image
+                    self.out_port_propag_image.write(self.out_buf_propag_image)
 
                     self.buffer.copy(output_pred_bottle)
                     self.counter = 0
@@ -244,6 +262,10 @@ class MultiFaceClassifier(yarp.RFModule):
                     self.out_port_human_image.write(self.out_buf_human_image)
                     # write prediction bottle
                     self.out_port_prediction.write(self.buffer)
+                    # propag received image
+                    self.out_buf_propag_array[:, :] = received_image
+                    self.out_port_propag_image.write(self.out_buf_propag_image)
+
                     self.counter = self.counter + 1
 
         return True
