@@ -13,11 +13,11 @@ if(NOT EXISTS ${import_path})
 	message(FATAL_ERROR "the python functions in utilitis and config are not in the expected folder.")
 endif()
 
-configure_file(classifier.py.in classifier.py @ONLY)
-configure_file(multiface_classifier.py.in multiface_classifier.py @ONLY)
+configure_file(mutualgaze-classifier.py.in mutualgaze-classifier.py @ONLY)
+configure_file(multiface-mutualgaze-classifier.py.in multiface-mutualgaze-classifier.py @ONLY)
 
-set(python_bin ${CMAKE_CURRENT_SOURCE_DIR}/../build/src/classifier.py
-			   ${CMAKE_CURRENT_SOURCE_DIR}/../build/src/multiface_classifier.py)
+set(python_bin ${CMAKE_CURRENT_SOURCE_DIR}/../build/src/mutualgaze-classifier.py
+			   ${CMAKE_CURRENT_SOURCE_DIR}/../build/src/multiface-mutualgaze-classifier.py)
 
 add_custom_target(copy_python_in_build ALL)
 add_custom_command(TARGET copy_python_in_build POST_BUILD

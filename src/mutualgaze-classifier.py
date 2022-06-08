@@ -14,7 +14,7 @@ from functions.utilities import draw_on_img, create_bottle, get_mean_depth_over_
 
 yarp.Network.init()
 
-class Classifier(yarp.RFModule):
+class MutualGazeClassifier(yarp.RFModule):
 
     def configure(self, rf):
         self.model_name = rf.find("model_name").asString()
@@ -31,56 +31,56 @@ class Classifier(yarp.RFModule):
         self.id_image = '%08d' % 0
 
         self.cmd_port = yarp.Port()
-        self.cmd_port.open('/classifier/command:i')
-        print('{:s} opened'.format('/classifier/command:i'))
+        self.cmd_port.open('/mutualgaze/command:i')
+        print('{:s} opened'.format('/mutualgaze/command:i'))
         self.attach(self.cmd_port)
 
         # input port for rgb image
         self.in_port_human_image = yarp.BufferedPortImageRgb()
-        self.in_port_human_image.open('/classifier/image:i')
+        self.in_port_human_image.open('/mutualgaze/image:i')
         self.in_buf_human_array = np.ones((IMAGE_HEIGHT, IMAGE_WIDTH, 3), dtype=np.uint8)
         self.in_buf_human_image = yarp.ImageRgb()
         self.in_buf_human_image.resize(IMAGE_WIDTH, IMAGE_HEIGHT)
         self.in_buf_human_image.setExternal(self.in_buf_human_array.data, self.in_buf_human_array.shape[1], self.in_buf_human_array.shape[0])
-        print('{:s} opened'.format('/classifier/image:i'))
+        print('{:s} opened'.format('/mutualgaze/image:i'))
 
         # input port for depth
         self.in_port_human_depth = yarp.BufferedPortImageFloat()
-        self.in_port_human_depth_name = '/classifier/depth:i'
+        self.in_port_human_depth_name = '/mutualgaze/depth:i'
         self.in_port_human_depth.open(self.in_port_human_depth_name)
         self.in_buf_human_depth_array = np.ones((IMAGE_HEIGHT, IMAGE_WIDTH, 1), dtype=np.float32)
         self.in_buf_human_depth = yarp.ImageFloat()
         self.in_buf_human_depth.resize(IMAGE_WIDTH, IMAGE_HEIGHT)
         self.in_buf_human_depth.setExternal(self.in_buf_human_depth_array.data, self.in_buf_human_depth_array.shape[1], self.in_buf_human_depth_array.shape[0])
-        print('{:s} opened'.format('/classifier/depth:i'))
+        print('{:s} opened'.format('/mutualgaze/depth:i'))
 
         # input port for openpose data
         self.in_port_human_data = yarp.BufferedPortBottle()
-        self.in_port_human_data.open('/classifier/data:i')
-        print('{:s} opened'.format('/classifier/data:i'))
+        self.in_port_human_data.open('/mutualgaze/data:i')
+        print('{:s} opened'.format('/mutualgaze/data:i'))
 
         # output port for the prediction
         self.out_port_prediction = yarp.Port()
-        self.out_port_prediction.open('/classifier/pred:o')
-        print('{:s} opened'.format('/classifier/pred:o'))
+        self.out_port_prediction.open('/mutualgaze/pred:o')
+        print('{:s} opened'.format('/mutualgaze/pred:o'))
 
         # output port for rgb image
         self.out_port_human_image = yarp.Port()
-        self.out_port_human_image.open('/classifier/image:o')
+        self.out_port_human_image.open('/mutualgaze/image:o')
         self.out_buf_human_array = np.ones((IMAGE_HEIGHT, IMAGE_WIDTH, 3), dtype=np.uint8)
         self.out_buf_human_image = yarp.ImageRgb()
         self.out_buf_human_image.resize(IMAGE_WIDTH, IMAGE_HEIGHT)
         self.out_buf_human_image.setExternal(self.out_buf_human_array.data, self.out_buf_human_array.shape[1], self.out_buf_human_array.shape[0])
-        print('{:s} opened'.format('/classifier/image:o'))
+        print('{:s} opened'.format('/mutualgaze/image:o'))
 
         # output port for dumper
         self.out_port_human_image_dump = yarp.Port()
-        self.out_port_human_image_dump.open('/classifier/dump:o')
+        self.out_port_human_image_dump.open('/mutualgaze/dump:o')
         self.out_buf_human_array_dump = np.ones((IMAGE_HEIGHT, IMAGE_WIDTH, 3), dtype=np.uint8)
         self.out_buf_human_image_dump = yarp.ImageRgb()
         self.out_buf_human_image_dump.resize(IMAGE_WIDTH, IMAGE_HEIGHT)
         self.out_buf_human_image_dump.setExternal(self.out_buf_human_array_dump.data, self.out_buf_human_array_dump.shape[1], self.out_buf_human_array_dump.shape[0])
-        print('{:s} opened'.format('/classifier/dump:o'))
+        print('{:s} opened'.format('/mutualgaze/dump:o'))
 
         self.human_image = np.ones((IMAGE_HEIGHT, IMAGE_WIDTH, 3), dtype=np.uint8)
         self.human_image_depth = np.ones((IMAGE_HEIGHT, IMAGE_WIDTH, 1), dtype=np.float32)
@@ -232,11 +232,11 @@ if __name__ == '__main__':
 
     rf = yarp.ResourceFinder()
     rf.setVerbose(True)
-    rf.setDefaultContext("Classifier")
+    rf.setDefaultContext("MutualGazeClassifier")
     rf.setDefaultConfigFile('./app/config/classifier_conf.ini')
 
     rf.configure(sys.argv)
 
     # Run module
-    manager = Classifier()
+    manager = MutualGazeClassifier()
     manager.runModule(rf)
