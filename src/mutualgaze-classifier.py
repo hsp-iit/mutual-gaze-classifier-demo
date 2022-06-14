@@ -229,7 +229,7 @@ class MutualGazeClassifier(yarp.RFModule):
                         start = (self.history[0])[0]
                         end = (self.history[-1])[0]
                         elapsed_ms = (end-start)*1000
-                        if elapsed_ms > self.MAX_DURATION_MG:
+                        if elapsed_ms >= self.MAX_DURATION_MG:
                             # check prediction == 1 > 95% of history
                             count_eye_contact = [self.history[i][1] for i in range(0, len(self.history))].count(1)
                             if count_eye_contact > math.floor((len(self.history)/100)*95):
