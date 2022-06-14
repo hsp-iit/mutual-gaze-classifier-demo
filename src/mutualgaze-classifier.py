@@ -6,6 +6,7 @@ import sys
 import pickle as pk
 import distutils.util
 import cv2
+import time, math
 
 from functions.config import IMAGE_HEIGHT, IMAGE_WIDTH, NUM_JOINTS
 from functions.utilities import read_openpose_data, get_features
@@ -24,11 +25,15 @@ class MutualGazeClassifier(yarp.RFModule):
         print('Max framerate: %s' % str(self.MAX_FRAMERATE))
         self.threshold = rf.find("max_propagation").asInt32()  # to reset the buffer
         print('SVM Buffer threshold: %d' % self.threshold)
+        self.MAX_DURATION_MG = rf.find("duration_mutual_gaze").asInt32()  # duration of mutual gaze in milliseconds
+        print('Duration of mutual gaze to be significant: %d' % self.MAX_DURATION_MG)
+
         self.buffer = ('', (0, 0), 0, 0, 0)  # centroid, prediction and level of confidence
         self.counter = 0  # counter for the threshold
         self.svm_buffer_size = 3
         self.svm_buffer = []
         self.id_image = '%08d' % 0
+        self.history = []
 
         self.cmd_port = yarp.Port()
         self.cmd_port.open('/mutualgaze/command:i')
@@ -60,9 +65,14 @@ class MutualGazeClassifier(yarp.RFModule):
         print('{:s} opened'.format('/mutualgaze/data:i'))
 
         # output port for the prediction
-        self.out_port_prediction = yarp.Port()
-        self.out_port_prediction.open('/mutualgaze/pred:o')
-        print('{:s} opened'.format('/mutualgaze/pred:o'))
+        self.out_port_framed_prediction = yarp.Port()
+        self.out_port_framed_prediction.open('/mutualgaze/framed/pred:o')
+        print('{:s} opened'.format('/mutualgaze/framed/pred:o'))
+
+        # output port for the significant mutual gaze
+        self.out_port_timed_prediction = yarp.Port()
+        self.out_port_timed_prediction.open('/mutualgaze/timed/pred:o')
+        print('{:s} opened'.format('/mutualgaze/timed/pred:o'))
 
         # output port for rgb image
         self.out_port_human_image = yarp.Port()
@@ -120,7 +130,8 @@ class MutualGazeClassifier(yarp.RFModule):
         self.in_port_human_depth.close()
         self.out_port_human_image.close()
         self.out_port_propag_image.close()
-        self.out_port_prediction.close()
+        self.out_port_framed_prediction.close()
+        self.out_port_timed_prediction.close()
         return True
 
     def interruptModule(self):
@@ -130,7 +141,8 @@ class MutualGazeClassifier(yarp.RFModule):
         self.in_port_human_depth.close()
         self.out_port_human_image.close()
         self.out_port_propag_image.close()
-        self.out_port_prediction.close()
+        self.out_port_framed_prediction.close()
+        self.out_port_timed_prediction.close()
         return True
 
     def getPeriod(self):
@@ -185,7 +197,7 @@ class MutualGazeClassifier(yarp.RFModule):
 
                     count_class_0 = [self.svm_buffer[i][0] for i in range(0, len(self.svm_buffer))].count(0)
                     count_class_1 = [self.svm_buffer[i][0] for i in range(0, len(self.svm_buffer))].count(1)
-                    if (count_class_1 == count_class_0):
+                    if count_class_1 == count_class_0:
                         y_winner = y_pred[0]
                         prob_mean = prob
                     else:
@@ -204,13 +216,32 @@ class MutualGazeClassifier(yarp.RFModule):
 
                     self.out_buf_human_array[:, :] = human_image
                     self.out_port_human_image.write(self.out_buf_human_image)
-                    self.out_port_prediction.write(pred)
+                    self.out_port_framed_prediction.write(pred)
                     # propag received image
                     self.out_buf_propag_array[:, :] = self.human_image
                     self.out_port_propag_image.write(self.out_buf_propag_image)
 
                     self.buffer = (self.id_image, (int(ld[itP,0]), int(ld[itP,1])), depth, y_winner, prob_mean)
                     self.counter = 0
+
+                    self.history.append((time.time(), y_winner))
+                    if len(self.history) > 0:
+                        start = (self.history[0])[0]
+                        end = (self.history[-1])[0]
+                        elapsed_ms = (end-start)*1000
+                        if elapsed_ms > self.MAX_DURATION_MG:
+                            # check prediction == 1 > 95% of history
+                            count_eye_contact = [self.history[i][1] for i in range(0, len(self.history))].count(1)
+                            if count_eye_contact > math.floor((len(self.history)/100)*95):
+                                # write to the output
+                                timed_pred = yarp.Bottle()
+                                timed_pred.addString("mutual-gaze")
+                                timed_pred.addInt32(int(elapsed_ms))
+                                timed_pred.addInt32(len(self.history))
+                                self.out_port_timed_prediction.write(timed_pred)
+
+                            # reset the history
+                            self.history = []
                 else:
                     pred = create_bottle((self.id_image, (), -1, -1, -1))
                     human_image = cv2.putText(human_image, 'id: ' + str(self.id_image), tuple([25, 30]), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2, cv2.LINE_AA)
@@ -218,7 +249,7 @@ class MutualGazeClassifier(yarp.RFModule):
                     # send in output only the image with prediction set to -1 (invalid value)
                     self.out_buf_human_array[:, :] = human_image
                     self.out_port_human_image.write(self.out_buf_human_image)
-                    self.out_port_prediction.write(pred)
+                    self.out_port_framed_prediction.write(pred)
                     # propag received image
                     self.out_buf_propag_array[:, :] = self.human_image
                     self.out_port_propag_image.write(self.out_buf_propag_image)
@@ -239,7 +270,7 @@ class MutualGazeClassifier(yarp.RFModule):
                     # write rgb image
                     self.out_buf_human_array[:, :] = human_image
                     self.out_port_human_image.write(self.out_buf_human_image)
-                    self.out_port_prediction.write(pred)
+                    self.out_port_framed_prediction.write(pred)
                     # propag received image
                     self.out_buf_propag_array[:, :] = self.human_image
                     self.out_port_propag_image.write(self.out_buf_propag_image)
