@@ -171,7 +171,7 @@ class MutualGazeClassifier(yarp.RFModule):
             if self.MAX_FRAMERATE:
                 received_data = self.in_port_human_data.read(False)  # non blocking
             else:
-                received_data = self.in_port_human_data.read()
+                received_data = self.in_port_human_data.read(False)
 
             if received_data:
                 poses, conf_poses, faces, conf_faces = read_openpose_data(received_data)
@@ -254,9 +254,7 @@ class MutualGazeClassifier(yarp.RFModule):
                     self.out_buf_human_array[:, :] = human_image
                     self.out_port_human_image.write(self.out_buf_human_image)
                     self.out_port_framed_prediction.write(pred)
-                    # propag received image
-                    self.out_buf_propag_array[:, :] = self.human_image
-                    self.out_port_propag_image.write(self.out_buf_propag_image)
+
 
                     self.buffer = (self.id_image, (), -1, -1, -1)
                     self.counter = 0
@@ -275,11 +273,19 @@ class MutualGazeClassifier(yarp.RFModule):
                     self.out_buf_human_array[:, :] = human_image
                     self.out_port_human_image.write(self.out_buf_human_image)
                     self.out_port_framed_prediction.write(pred)
-                    # propag received image
-                    self.out_buf_propag_array[:, :] = self.human_image
-                    self.out_port_propag_image.write(self.out_buf_propag_image)
 
                     self.counter = self.counter + 1
+                else:
+                    human_image = cv2.putText(human_image, 'id: ' + str(self.id_image), tuple([25, 30]), cv2.FONT_HERSHEY_SIMPLEX,
+                                              0.6, (0, 0, 255), 2,
+                                              cv2.LINE_AA)
+                    # send in output only the image with the id
+                    self.out_buf_human_array[:, :] = human_image
+                    self.out_port_human_image.write(self.out_buf_human_image)
+
+            # propag received image
+            self.out_buf_propag_array[:, :] = self.human_image
+            self.out_port_propag_image.write(self.out_buf_propag_image)
 
         return True
 
