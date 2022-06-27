@@ -132,6 +132,8 @@ class MutualGazeClassifier(yarp.RFModule):
         self.out_port_propag_image.close()
         self.out_port_framed_prediction.close()
         self.out_port_timed_prediction.close()
+        self.out_port_human_image_dump.close()
+        self.cmd_port.close()
         return True
 
     def interruptModule(self):
@@ -143,6 +145,8 @@ class MutualGazeClassifier(yarp.RFModule):
         self.out_port_propag_image.close()
         self.out_port_framed_prediction.close()
         self.out_port_timed_prediction.close()
+        self.out_port_human_image_dump.close()
+        self.cmd_port.close()
         return True
 
     def getPeriod(self):
