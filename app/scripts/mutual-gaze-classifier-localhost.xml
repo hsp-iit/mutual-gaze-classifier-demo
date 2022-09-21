@@ -17,6 +17,12 @@
 	</module>
 
 	<module>
+		<name>yarpdev</name>
+		<parameters>--device opencv_grabber --camera 0 --name /webcam/rgbImage:o --width 640 --height 480</parameters>
+		<node>localhost</node>
+	</module>
+
+	<module>
 		<name>yarpview</name>
 		<parameters>--name /view/rgb --w 640 --h 480</parameters>
 		<node>localhost</node>
@@ -50,30 +56,42 @@
 	</connection>
 
 	<connection>
+		<from>/webcam/rgbImage:o</from>
+		<to>/view/rgb</to>
+		<protocol>mjpeg</protocol>
+	</connection>
+
+	<connection>
+		<from>/webcam/rgbImage:o</from>
+		<to>/yarpOpenPose/image:i</to>
+		<protocol>mjpeg</protocol>
+	</connection>
+
+	<connection>
 		<from>/yarpOpenPose/image:o</from>
 		<to>/view/skeleton</to>
 		<protocol>mjpeg</protocol>
 	</connection>
 	
 	<connection>
-		<from>/depthCamera/rgbImage:o</from>
-		<to>/classifier/image:i</to>
+		<from>/yarpOpenPose/propag:o</from>
+		<to>/mutualgaze/image:i</to>
 		<protocol>mjpeg</protocol>
 	</connection>
 
 	<connection>
 		<from>/yarpOpenPose/target:o</from>
-		<to>/classifier/data:i</to>
+		<to>/mutualgaze/data:i</to>
 	</connection>
 
 	<connection>
 	      	<from>/depthCamera/depthImage:o</from>
-	      	<to>/classifier/depth:i</to>
+	      	<to>/mutualgaze/depth:i</to>
 	      	<protocol>fast_tcp</protocol>
 	</connection>
 
 	<connection>
-	      	<from>/classifier/image:o</from>
+	      	<from>/mutualgaze/image:o</from>
 	      	<to>/view/eyecontact</to>
 	      	<protocol>mjpeg</protocol>
 	</connection>

@@ -238,7 +238,9 @@ class MutualGazeClassifier(yarp.RFModule):
                         if elapsed_ms >= self.MAX_DURATION_MG:
                             # check prediction == 1 > 95% of history
                             count_eye_contact = [self.history[i][1] for i in range(0, len(self.history))].count(1)
-                            if count_eye_contact > math.floor((len(self.history) / 100) * 95):
+                            # example: 5 fps with MAX_DURATION_MG = 1500 ms (around 8 frame)
+                            # send the result when 6 out 8 frame
+                            if count_eye_contact > math.floor((len(self.history) / 100) * 80):
                                 # write to the output
                                 timed_pred = yarp.Bottle()
                                 timed_pred.addString("mutual-gaze")
