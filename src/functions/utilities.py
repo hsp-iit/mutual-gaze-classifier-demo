@@ -209,8 +209,8 @@ def draw_on_img(img, id, centroid, y_pred, prob):
         txt = 'EC YES'
 
     img = cv2.circle(img, tuple([int(centroid[0]), int(centroid[1])]), 6, (0, 0, 255), -1)
-    img = cv2.putText(img, txt, tuple([int(centroid[0]), int(centroid[1])-120]), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2, cv2.LINE_AA)
-    img = cv2.putText(img, 'c: %0.2f' % prob, tuple([int(centroid[0]), int(centroid[1]) - 90]), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2, cv2.LINE_AA)
+    img = cv2.putText(img, txt, tuple([int(centroid[0]+70), int(centroid[1])]), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2, cv2.LINE_AA)
+    img = cv2.putText(img, 'c: %0.2f' % prob, tuple([int(centroid[0]+70), int(centroid[1]) - 30]), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2, cv2.LINE_AA)
 
     return img
 
