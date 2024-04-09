@@ -166,7 +166,7 @@ class MultiFaceClassifier(yarp.RFModule):
                     wx = np.concatenate((np.multiply(x[:, ::2], c), np.multiply(x[:, 1::2], c)), axis=1)
 
                     # return a prob value between 0,1 for each class
-                    y_classes = self.clf.best_estimator_.predict_proba(wx)
+                    y_classes = self.clf.predict_proba(wx)
 
                     output_pred_bottle = yarp.Bottle()
                     for itP in range(0, y_classes.shape[0]):

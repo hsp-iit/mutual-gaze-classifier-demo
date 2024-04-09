@@ -168,7 +168,7 @@ class MultiFaceClassifier(yarp.RFModule):
                     wx = np.concatenate((np.multiply(x[:, ::2], c), np.multiply(x[:, 1::2], c)), axis=1)
 
                     # return a prob value between 0,1 for each class
-                    y_classes = self.clf.best_estimator_.predict_proba(wx)
+                    y_classes = self.clf.predict_proba(wx)
 
                     output_pred_bottle = yarp.Bottle()
                     for itP in range(0, y_classes.shape[0]):
@@ -204,7 +204,7 @@ class MultiFaceClassifier(yarp.RFModule):
                             depth = get_mean_depth_over_area(self.human_image_depth, [int(ld[itP, 0]), int(ld[itP, 1])], 20)
                         else:
                             depth = -1
-
+                        print(f"WINNER: {y_winner}")
                         pred = create_bottle((self.id_image, (int(ld[itP,0]), int(ld[itP,1])), depth, y_winner, prob_mean))
                         output_pred_bottle.addList().read(pred)
                         human_image = draw_on_img(human_image, self.id_image, (ld[itP,0], ld[itP,1]), y_winner, prob_mean)
