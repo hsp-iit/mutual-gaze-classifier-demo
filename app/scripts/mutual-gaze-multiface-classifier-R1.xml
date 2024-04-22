@@ -10,15 +10,14 @@
 	</module>
 
 	<module>
-		<name>yarpOpenPose</name>
-		<parameters> --from /usr/local/share/ICUBcontrib/contexts/mutual-gaze-classifier-demo/yarpOpenpose.ini</parameters>
+		<name>yarpRTMPose</name>
 		<node>localhost</node>
 	</module>
 
 	<module>
-		<name>multiface_classifier.py</name>
+		<name>multiface-mutualgaze-classifier.py</name>
 		<parameters>--from /usr/local/share/ICUBcontrib/contexts/mutual-gaze-classifier-demo/classifier_conf.ini</parameters>
-		<deployer>python3.6</deployer>
+		<deployer>python3</deployer>
 		<node>localhost</node>
 	</module>
 
