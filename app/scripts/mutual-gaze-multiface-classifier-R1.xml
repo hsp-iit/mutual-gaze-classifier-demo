@@ -50,32 +50,33 @@
 
 	<connection>
 		<from>/depthCamera/rgbImage:o</from>
-		<to>/yarpOpenPose/image:i</to>
+		<to>/yarpRTMPose/image:i</to>
 		<protocol>mjpeg</protocol>
 	</connection>
 
 	<connection>
-		<from>/yarpOpenPose/image:o</from>
+		<from>/yarpRTMPose/image:o</from>
 		<to>/view/skeleton</to>
 		<protocol>mjpeg</protocol>
 	</connection>
 
 	<connection>
 		<from>/depthCamera/rgbImage:o</from>
-		<to>/classifier/image:i</to>
+		<to>/mutualgaze/image:i</to>
 		<protocol>mjpeg</protocol>
 	</connection>
 
 	<connection>
-		<from>/yarpOpenPose/target:o</from>
-		<to>/classifier/data:i</to>
+		<from>/yarpRTMPose/target:o</from>
+		<to>/mutualgaze/data:i</to>
 	</connection>
 
 	<connection>
-	  	<from>/classifier/image:o</from>
+	  	<from>/mutualgaze/image:o</from>
 	  	<to>/view/eyecontact</to>
 	  	<protocol>mjpeg</protocol>
 	</connection>
 
 </application>
+
 
