@@ -203,7 +203,7 @@ def draw_on_img(img, id, centroid, y_pred, prob):
     # write index close to the centroid
     img = cv2.putText(img, 'id: ' + str(id), tuple([25, 30]), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2, cv2.LINE_AA)
 
-    if y_pred != 0:
+    if y_pred == 0:
         txt = 'EC NO'
     else:
         txt = 'EC YES'
