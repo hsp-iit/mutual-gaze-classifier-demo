@@ -33,6 +33,8 @@ class MultiFaceClassifier(yarp.RFModule):
         self.keypoint_detector = rf.find("keypoint_detector").asString()
         self.JOINTS_POSE, self.JOINTS_FACE = get_keypoints_inds(self.keypoint_detector)
         self.NUM_JOINTS = len(self.JOINTS_POSE) + len(self.JOINTS_FACE)
+        self.pose_conf_threshold = rf.find("pose_conf_threshold").asFloat32()
+        self.face_conf_threshold = rf.find("face_conf_threshold").asFloat32()
 
         self.cmd_port = yarp.Port()
         self.cmd_port.open('/mutualgaze/command:i')
@@ -152,6 +154,13 @@ class MultiFaceClassifier(yarp.RFModule):
 
             if received_data:
                 poses, conf_poses, faces, conf_faces = read_openpose_data(received_data)
+
+                if self.pose_conf_threshold > 0 and self.face_conf_threshold > 0:
+                    poses = [pose for pose, conf in zip(poses, conf_poses) if conf.mean() > self.pose_conf_threshold]
+                    conf_poses= [conf for conf in conf_poses if conf.mean() > self.pose_conf_threshold]
+                    faces = [face for face, conf in zip(faces, conf_faces) if conf.mean() > self.face_conf_threshold]
+                    conf_faces= [conf for conf in conf_faces if conf.mean() > self.face_conf_threshold]
+                    
                 # get features of all people in the image
                 data = get_features(poses, conf_poses, faces, conf_faces, self.JOINTS_POSE, self.JOINTS_FACE)
 
