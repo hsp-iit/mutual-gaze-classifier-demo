@@ -292,5 +292,4 @@ RUN cd / projects/ && \
     cmake .. && \
     make install
 
-# RUN yarp namespace /cer04
-# RUN yarp conf 192.168.100.10 10000
+RUN yarp conf 192.168.100.10 10000

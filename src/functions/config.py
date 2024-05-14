@@ -6,7 +6,7 @@ IMAGE_HEIGHT = 480
 
 # open pose
 OPENPOSE_JOINTS_POSE = [0, 15, 16, 17, 18]
-MMPOSE_JOINTS_POSE = [2, 3, 4, 5, 6] # seemed like mapping was off for RTM pose?
+MMPOSE_JOINTS_POSE = [2, 3, 4, 5, 6]
 OPENPOSE_JOINTS_FACE = [36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 68, 69] # joint indices for openpose
 MMPOSE_JOINTS_FACE = [36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47] # coco wholebody no nose
 # MMPOSE_JOINTS_FACE = [27, 28, 29, 30, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47] # coco wholebody (nose and eyes) 
