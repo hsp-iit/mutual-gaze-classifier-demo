@@ -26,7 +26,6 @@ RUN mkdir -p /etc/bash_completion.d/ &&\
         libode-dev \
         liblua5.1-dev \
         lua5.1 \ 
-        swig \ 
         libsdl1.2-dev \
         libxml2-dev\
         # YARP
@@ -86,7 +85,20 @@ COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY setup.sh ${ROBOTOLOGY_INITIALIZATION_FILE}
 ENTRYPOINT [ "/usr/local/bin/entrypoint.sh" ]
 
-RUN mkdir ${PROJECTS_DIR} && cd ${PROJECTS_DIR} &&\
+RUN mkdir ${PROJECTS_DIR}
+
+#### Install swig ####
+RUN apt-get update && apt-get install -y automake byacc bison
+RUN cd ${PROJECTS_DIR} &&\
+    git clone https://github.com/swig/swig.git &&\
+    cd swig &&\
+    git checkout tags/v4.0.2
+RUN cd ${PROJECTS_DIR}/swig &&\
+    ./autogen.sh &&\
+    ./configure &&\
+    make && make install
+
+RUN cd ${PROJECTS_DIR} &&\
     git clone https://github.com/robotology/robotology-superbuild.git &&\
     cd robotology-superbuild &&\
     git checkout ${release} &&\
