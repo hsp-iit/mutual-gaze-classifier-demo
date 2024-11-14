@@ -216,7 +216,7 @@ RUN python3 -m pip install torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2
 # Install mmpose dependencies
 RUN pip install -U openmim \
     && mim install mmengine \
-    && mim install "mmcv>=2.0.0" \
+    && mim install "mmcv==2.0.0rc4" \
     && mim install "mmdet>=3.0.0"
 
 # Install mmpose
@@ -282,14 +282,16 @@ RUN git clone https://github.com/robotology/human-sensing.git \
     && mkdir build && cd build \
     && cmake .. \
     && make install \ 
+    && cd /mmdeploy \
     && /human-sensing/yarpRTMPose/app/scripts/deploy.sh
 
 #### Clone repository installation ####
 RUN cd / projects/ && \
-    git clone https://github.com/MariaLombardi/mutual-gaze-classifier-demo.git && \
+    git clone -b rtm https://github.com/mga-97/mutual-gaze-classifier-demo.git && \
     cd mutual-gaze-classifier-demo && \
     mkdir build && cd build && \
     cmake .. && \
     make install
 
+# RUN yarp namespace /cer04
 RUN yarp conf 192.168.100.10 10000
