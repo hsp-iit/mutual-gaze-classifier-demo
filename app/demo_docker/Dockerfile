@@ -1,6 +1,4 @@
-#start from image passed by argument during build process. Usually it is an ubuntu image plus mesa library.
-ARG START_IMG="none"
-FROM $START_IMG
+FROM nvidia/cuda:11.7.1-cudnn8-devel-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -11,12 +9,16 @@ RUN mkdir -p /etc/bash_completion.d/ &&\
     apt-get install -y \
         # MISC
         bash-completion \
-        qt5-default \
-        git \
+        qtbase5-dev \
+        qt5-qmake \
+        qt5-qmake \
         cmake \
         cmake-curses-gui \ 
         build-essential \
         vim \
+        terminator \
+        wget \
+        git \
         #core
         coinor-libipopt-dev \ 
         libboost-system-dev \
@@ -27,7 +29,7 @@ RUN mkdir -p /etc/bash_completion.d/ &&\
         liblua5.1-dev \
         lua5.1 \ 
         libsdl1.2-dev \
-        libxml2-dev\
+        libxml2-dev \
         # YARP
         libace-dev \
         libeigen3-dev \
@@ -51,16 +53,10 @@ RUN mkdir -p /etc/bash_completion.d/ &&\
         qml-module-qt-labs-folderlistmodel \
         qml-module-qt-labs-settings 
 
-#In order to install cmake 12.0 required by superbuild
-RUN apt-get install -y apt-transport-https ca-certificates gnupg software-properties-common wget &&\
-    wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | apt-key add - &&\
-    apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main' &&\
-    apt-get update &&\
-    apt-get install -y kitware-archive-keyring &&\
-    apt-key --keyring /etc/apt/trusted.gpg del C1F34CDD40CD72DA &&\
-    apt-get install -y cmake \
-    &&\
-    rm -rf /var/lib/apt/lists/* 
+# CMake 3.20.0 and add repository if ubuntu < 18.04
+RUN wget https://github.com/Kitware/CMake/releases/download/v3.20.0/cmake-3.20.0-linux-x86_64.tar.gz \
+    && tar -xzvf cmake-3.20.0-linux-x86_64.tar.gz \
+    && ln -sf $(pwd)/cmake-3.20.0-linux-x86_64/bin/* /usr/bin/
 
 
 
@@ -72,7 +68,6 @@ ARG CMAKE_EXTRA_OPTIONS=-j2
 ARG INSTALL_DIR="/usr/local"
 ARG release="master -b master_branch"
 ARG sbtag="Stable"
-#RUN if [ "$release" = "Stable" ]; then echo STABLE version is building; elif [ "$release" = "Ustable" ]; then echo UNSTABLE version is building && ${TAG}=Unstable; else echo SPECIFIC version $release is building && branch=$release; fi
 
 
 RUN echo "DEBUG ==>  Release:" ${release} &&\
@@ -85,23 +80,26 @@ COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY setup.sh ${ROBOTOLOGY_INITIALIZATION_FILE}
 ENTRYPOINT [ "/usr/local/bin/entrypoint.sh" ]
 
-RUN mkdir ${PROJECTS_DIR}
+RUN apt-get install -y python3.10-dev
 
-#### Install swig ####
-RUN apt-get update && apt-get install -y automake byacc bison
-RUN cd ${PROJECTS_DIR} &&\
-    git clone https://github.com/swig/swig.git &&\
-    cd swig &&\
-    git checkout tags/v4.0.2
-RUN cd ${PROJECTS_DIR}/swig &&\
-    ./autogen.sh &&\
-    ./configure &&\
-    make && make install
+RUN apt-get update && apt-get install -y \
+        python3.10 \
+        python3-pip
 
-RUN cd ${PROJECTS_DIR} &&\
+RUN apt-get update && apt-get install -y \
+        python3.10-dev \
+        python3.10-venv \
+        python3.10-distutils 
+
+RUN python3 -m venv /venv
+    
+ENV PATH=/venv/bin:$PATH
+
+RUN mkdir ${PROJECTS_DIR} && cd ${PROJECTS_DIR} &&\
     git clone https://github.com/robotology/robotology-superbuild.git &&\
     cd robotology-superbuild &&\
     git checkout ${release} &&\
+    ./scripts/install_apt_dependencies.sh &&\
     mkdir build && cd build &&\
     cmake .. \
         -G "$CMAKE_GENERATOR" \
@@ -121,15 +119,6 @@ RUN cd ${PROJECTS_DIR} &&\
 
 # This step ensures python looks for yarp bindings in the correct place
 RUN echo 'export PYTHONPATH=$PYTHONPATH:/usr/local/lib/python3/dist-packages' >> $ROBOTOLOGY_INITIALIZATION_FILE
-
-
-#copy scripts in /usr/local/bin
-#RUN  cp ${PROJECTS_DIR}/robotology-superbuild/robotology/YARP/scripts/yarp_completion ${INSTALL_DIR}/bin  &&\
-#RUN  mv ${PROJECTS_DIR}/robotology-superbuild/robotology/YARP/data/bash-completion/yarp ${INSTALL_DIR}/bin/yarp_completion  &&\
-#       chmod +x ${INSTALL_DIR}/bin/yarp_completion
-
-#RUN  cp ${PROJECTS_DIR}/robotology-superbuild/robotology/YARP/data/bash-completion/yarp ${INSTALL_DIR}/bin &&\
-#        chmod +x ${INSTALL_DIR}/bin/yarp
 
 RUN echo "source ${INSTALL_DIR}/share/robotology-superbuild/setup.sh" >> $ROBOTOLOGY_INITIALIZATION_FILE
 
@@ -165,7 +154,6 @@ ENV QT_X11_NO_MITSHM 1
 ENV YARP_COLORED_OUTPUT 1
 
 
-
 ARG metadata="none"
 
 ENV img_metadata=${metadata}
@@ -189,33 +177,19 @@ RUN apt-get install -y \
     libavcodec-dev \
     zlib1g-dev
 
-#### Starts custom ####
-
-#### Install python ####
-#RUN apt-get install -y libmtdev-dev
-RUN apt-get install -y python-dev
-RUN add-apt-repository ppa:deadsnakes/ppa
-RUN apt-get update && apt-get install -y \
-        python3.6 \
-        python3-pip
-
-RUN apt-get update && apt-get install -y \
-        python3-distutils \
-        python3-setuptools
-
 RUN apt-get update
 
 #### Install python packages ####
-RUN python3.6 -m pip install --upgrade pip
-RUN python3.6 -m pip install --upgrade setuptools
-RUN python3.6 -m pip install numpy
-RUN python3.6 -m pip install opencv-contrib-python
-RUN python3.6 -m pip install pandas
-RUN python3.6 -m pip install wheel
-RUN python3.6 -m pip install scikit-learn
-RUN python3.6 -m pip install keras
-RUN python3.6 -m pip install tensorflow
-RUN python3.6 -m pip install pynput
+RUN python3 -m pip install --upgrade pip
+RUN python3 -m pip install --upgrade setuptools
+RUN python3 -m pip install numpy
+RUN python3 -m pip install opencv-contrib-python
+RUN python3 -m pip install pandas
+RUN python3 -m pip install wheel
+RUN python3 -m pip install scikit-learn
+RUN python3 -m pip install keras
+RUN python3 -m pip install tensorflow
+RUN python3 -m pip install pynput
 
 #### Dependencies ####
 RUN apt-get install -y libgoogle-glog-dev libboost-all-dev libhdf5-serial-dev libatlas-base-dev
@@ -235,43 +209,88 @@ RUN cd /projects/robotology-superbuild/build && \
     make -j12
 RUN export PYTHONPATH=/projects/robotology-superbuild/build/src/YARP/lib/python3
 
+# ### Install torch, necessary for mmpose
+RUN python3 -m pip install torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2
 
-#### Install openpose ####
-RUN cd /projects &&\
-    git clone https://github.com/CMU-Perceptual-Computing-Lab/openpose &&\
-    cd openpose/ &&\
-    git submodule update --init --recursive --remote && \
-    git checkout tags/v1.6.0
+# Install mmpose dependencies
+RUN pip install -U openmim \
+    && mim install mmengine \
+    && mim install "mmcv==2.0.0rc4" \
+    && mim install "mmdet>=3.0.0"
 
-# compile and install openpose
-RUN  apt-get -y install protobuf-compiler
-RUN cd /projects/openpose &&\
-    mkdir build
-RUN cd /projects/openpose/build &&\
-    cmake .. -DDOWNLOAD_HAND_MODEL=OFF
-#    cmake .. -DDOWNLOAD_HAND_MODEL=OFF -DCUDA_ARCH=Manual -DCUDA_ARCH_BIN=75 -DCUDA_ARCH_PTX=75
-RUN cd /projects/openpose/build &&\ 
-    make -j$(nproc) &&\
-    make install
+# Install mmpose
+RUN git clone https://github.com/open-mmlab/mmpose.git \
+    && cd mmpose \
+    && pip install -r requirements.txt \
+    && pip install -v -e .
 
-# compile and install yarpOpenPose
-RUN cd /projects && git clone https://github.com/robotology/human-sensing
-RUN cd /projects/human-sensing/yarpOpenPose &&\
-    mkdir build && \
-    cd /projects/human-sensing/yarpOpenPose/build &&\
-    cmake .. &&\
-    make && make install
+# Install mmdeploy and onnx runtime
+RUN pip install mmdeploy \
+    && pip install mmdeploy-runtime-gpu \
+    && pip install onnxruntime-gpu \
+    && wget https://github.com/microsoft/onnxruntime/releases/download/v1.15.1/onnxruntime-linux-x64-gpu-1.15.1.tgz \
+    && tar -zxvf onnxruntime-linux-x64-gpu-1.15.1.tgz 
+
+ENV ONNXRUNTIME_DIR=/onnxruntime-linux-x64-gpu-1.15.1
+
+ENV CUDA_BIN_PATH=/usr/local/cuda
+
+ENV LD_LIBRARY_PATH=${ONNXRUNTIME_DIR}/lib:/usr/lib/x86_64-linux-gnu/:/usr/local/cuda-11.7/compat/:$LD_LIBRARY_PATH
+
+# MMdeploy sdk prerequisites
+RUN git clone https://github.com/openppl-public/ppl.cv.git \
+    && cd ppl.cv \
+    && git checkout tags/v0.7.0 -b v0.7.0 \
+    && ./build.sh cuda
+
+ENV PPLCV_DIR=/ppl.cv
+
+# Install mmdeploy sdk
+RUN git clone -b main https://github.com/open-mmlab/mmdeploy.git --recursive --depth=1 \
+    && cd \mmdeploy \
+    && mkdir -p build && cd build \
+    && cmake .. \
+        -DMMDEPLOY_BUILD_SDK=ON \
+        -DMMDEPLOY_BUILD_SDK_PYTHON_API=ON \
+        -DMMDEPLOY_BUILD_EXAMPLES=ON \
+        -DMMDEPLOY_TARGET_DEVICES=cuda \
+        -DMMDEPLOY_TARGET_BACKENDS=ort \
+        -Dpplcv_DIR=${PPLCV_DIR}/cuda-build/install/lib/cmake/ppl \
+        -DONNXRUNTIME_DIR=${ONNXRUNTIME_DIR} \
+        -DCUDNN_DIR=${CUDNN_DIR} \
+        -DCMAKE_INSTALL_PREFIX=/usr/local \
+    && make -j8 && make install
+
+
+# Install ffmpeg libraries for video grabber utils
+RUN apt update && apt install -y ffmpeg \ 
+libavcodec-dev libavdevice-dev \ 
+libavformat-dev libavutil-dev
+
+
+# Install c++ unit test framework
+RUN git clone https://github.com/catchorg/Catch2.git \
+    && cd Catch2 \
+    && cmake -Bbuild -H. -DBUILD_TESTING=OFF \
+    && cmake --build build/ --target install
+
+
+# Install the application
+RUN git clone https://github.com/robotology/human-sensing.git \
+    && cd human-sensing/yarpRTMPose \
+    && mkdir build && cd build \
+    && cmake .. \
+    && make install \ 
+    && cd /mmdeploy \
+    && /human-sensing/yarpRTMPose/app/scripts/deploy.sh
 
 #### Clone repository installation ####
-RUN cd /projects/ && \
-    git clone https://github.com/MariaLombardi/mutual-gaze-classifier-demo.git
-RUN cd /projects/mutual-gaze-classifier-demo && \
+RUN cd / projects/ && \
+    git clone -b rtm https://github.com/mga-97/mutual-gaze-classifier-demo.git && \
+    cd mutual-gaze-classifier-demo && \
     mkdir build && cd build && \
-    cmake .. \
-    &&\
-    make \
-    &&\
-    make install \
+    cmake .. && \
+    make install
 
-RUN yarp namespace /cer04
+# RUN yarp namespace /cer04
 RUN yarp conf 192.168.100.10 10000

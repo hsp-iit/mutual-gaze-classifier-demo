@@ -4,7 +4,7 @@ import numpy as np
 import yarp
 import cv2
 
-from config import JOINTS_POSE, JOINTS_FACE, IMAGE_HEIGHT, IMAGE_WIDTH
+from config import IMAGE_HEIGHT, IMAGE_WIDTH
 
 
 def compute_centroid(points):
@@ -35,10 +35,10 @@ def dist_2d(p1, p2):
     return np.sqrt(squared_dist)
 
 
-def compute_head_face_features(pose, conf_pose, face, conf_face):
+def compute_head_face_features(pose, conf_pose, face, conf_face, pose_inds, face_inds):
 
-    n_joints_set = [pose[joint] for joint in JOINTS_POSE if joint_set(pose[joint], conf_pose[joint])]
-    n_joints_set.extend([face[joint] for joint in JOINTS_FACE if joint_set(face[joint], conf_face[joint])])
+    n_joints_set = [pose[joint] for joint in pose_inds if joint_set(pose[joint], conf_pose[joint])]
+    n_joints_set.extend([face[joint] for joint in face_inds if joint_set(face[joint], conf_face[joint])])
 
     if len(n_joints_set) < 2:
         return None, None
@@ -49,32 +49,32 @@ def compute_head_face_features(pose, conf_pose, face, conf_face):
     if max_dist == 0:
         return None, None
 
-    new_repr_pose = [(np.array(pose[joint]) - np.array(centroid)) for joint in JOINTS_POSE]
-    new_repr_face = [(np.array(face[joint]) - np.array(centroid)) for joint in JOINTS_FACE]
+    new_repr_pose = [(np.array(pose[joint]) - np.array(centroid)) for joint in pose_inds]
+    new_repr_face = [(np.array(face[joint]) - np.array(centroid)) for joint in face_inds]
 
     result = []
 
-    for i in range(0, len(JOINTS_POSE)):
-        if joint_set(pose[JOINTS_POSE[i]], conf_pose[JOINTS_POSE[i]]):
+    for i in range(0, len(pose_inds)):
+        if joint_set(pose[pose_inds[i]], conf_pose[pose_inds[i]]):
             result.append([new_repr_pose[i][0] / max_dist, new_repr_pose[i][1] / max_dist])
         else:
             result.append([0, 0])
 
-    for i in range(0, len(JOINTS_FACE)):
-        if joint_set(face[JOINTS_FACE[i]], conf_face[JOINTS_FACE[i]]):
+    for i in range(0, len(face_inds)):
+        if joint_set(face[face_inds[i]], conf_face[face_inds[i]]):
             result.append([new_repr_face[i][0] / max_dist, new_repr_face[i][1] / max_dist])
         else:
             result.append([0, 0])
 
     flat_list = [item for sublist in result for item in sublist]
 
-    for j in JOINTS_POSE:
+    for j in pose_inds:
         if conf_pose[j] > 0.1:
             flat_list.append(conf_pose[j])
         else:
             flat_list.append(0)
 
-    for j in JOINTS_FACE:
+    for j in face_inds:
         if conf_face[j] > 0.1:
             flat_list.append(conf_face[j])
         else:
@@ -84,13 +84,13 @@ def compute_head_face_features(pose, conf_pose, face, conf_face):
 
 
 # compute features for all people in the image
-def get_features(poses, conf_poses, faces, conf_faces):
+def get_features(poses, conf_poses, faces, conf_faces, pose_inds, face_inds): 
     data = []
-
+    
     for itP in range(0, len(poses)):
         try:
             # compute facial keypoints coordinates w.r.t. to head centroid
-            features, centr = compute_head_face_features(poses[itP], conf_poses[itP], faces[itP], conf_faces[itP])
+            features, centr = compute_head_face_features(poses[itP], conf_poses[itP], faces[itP], conf_faces[itP], pose_inds, face_inds)
             # if minimal amount of facial keypoints was detected
             if features is not None:
                 featMap = np.asarray(features)
