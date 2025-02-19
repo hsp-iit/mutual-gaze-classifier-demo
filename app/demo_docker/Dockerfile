@@ -28,7 +28,6 @@ RUN mkdir -p /etc/bash_completion.d/ &&\
         libode-dev \
         liblua5.1-dev \
         lua5.1 \ 
-        swig \ 
         libsdl1.2-dev \
         libxml2-dev \
         # YARP
