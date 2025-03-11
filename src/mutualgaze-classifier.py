@@ -8,7 +8,7 @@ import distutils.util
 import cv2
 import time, math
 
-from functions.config import IMAGE_HEIGHT, IMAGE_WIDTH, NUM_JOINTS
+from functions.config import IMAGE_HEIGHT, IMAGE_WIDTH, get_keypoints_inds
 from functions.utilities import read_openpose_data, get_features
 from functions.utilities import draw_on_img, create_bottle, get_mean_depth_over_area
 
@@ -27,6 +27,12 @@ class MutualGazeClassifier(yarp.RFModule):
         print('SVM Buffer threshold: %d' % self.threshold)
         self.MAX_DURATION_MG = rf.find("duration_mutual_gaze").asInt32()  # duration of mutual gaze in milliseconds
         print('Duration of mutual gaze to be significant: %d' % self.MAX_DURATION_MG)
+
+        self.keypoint_detector = rf.find("keypoint_detector").asString()
+        self.JOINTS_POSE, self.JOINTS_FACE = get_keypoints_inds(self.keypoint_detector)
+        self.NUM_JOINTS = len(self.JOINTS_POSE) + len(self.JOINTS_FACE)
+        self.pose_conf_threshold = rf.find("pose_conf_threshold").asFloat32()
+        self.face_conf_threshold = rf.find("face_conf_threshold").asFloat32()
 
         self.buffer = ('', (0, 0), 0, 0, 0)  # centroid, prediction and level of confidence
         self.counter = 0  # counter for the threshold
@@ -175,15 +181,22 @@ class MutualGazeClassifier(yarp.RFModule):
 
             if received_data:
                 poses, conf_poses, faces, conf_faces = read_openpose_data(received_data)
+
+                if self.pose_conf_threshold > 0 and self.face_conf_threshold > 0:
+                    poses = [pose for pose, conf in zip(poses, conf_poses) if conf.mean() > self.pose_conf_threshold]
+                    conf_poses= [conf for conf in conf_poses if conf.mean() > self.pose_conf_threshold]
+                    faces = [face for face, conf in zip(faces, conf_faces) if conf.mean() > self.face_conf_threshold]
+                    conf_faces= [conf for conf in conf_faces if conf.mean() > self.face_conf_threshold]
+
                 # get features of all people in the image
-                data = get_features(poses, conf_poses, faces, conf_faces)
+                data = get_features(poses, conf_poses, faces, conf_faces, self.JOINTS_POSE, self.JOINTS_FACE)
 
                 if data:
                     # predict model
                     # start from 2 because there is the centroid valued in the position [0,1]
                     ld = np.array(data)
-                    x = ld[:, 2:(NUM_JOINTS * 2) + 2]
-                    c = ld[:, (NUM_JOINTS * 2) + 2:ld.shape[1]]
+                    x = ld[:, 2:(self.NUM_JOINTS * 2) + 2]
+                    c = ld[:, (self.NUM_JOINTS * 2) + 2:ld.shape[1]]
                     # weight the coordinates for its confidence value
                     wx = np.concatenate((np.multiply(x[:, ::2], c), np.multiply(x[:, 1::2], c)), axis=1)
 

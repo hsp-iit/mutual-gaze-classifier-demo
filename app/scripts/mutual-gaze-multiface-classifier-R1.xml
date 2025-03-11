@@ -10,15 +10,14 @@
 	</module>
 
 	<module>
-		<name>yarpOpenPose</name>
-		<parameters> --from /usr/local/share/ICUBcontrib/contexts/mutual-gaze-classifier-demo/yarpOpenpose.ini</parameters>
+		<name>yarpRTMPose</name>
 		<node>localhost</node>
 	</module>
 
 	<module>
-		<name>multiface_classifier.py</name>
+		<name>multiface-mutualgaze-classifier.py</name>
 		<parameters>--from /usr/local/share/ICUBcontrib/contexts/mutual-gaze-classifier-demo/classifier_conf.ini</parameters>
-		<deployer>python3.6</deployer>
+		<deployer>python3</deployer>
 		<node>localhost</node>
 	</module>
 
@@ -51,32 +50,33 @@
 
 	<connection>
 		<from>/depthCamera/rgbImage:o</from>
-		<to>/yarpOpenPose/image:i</to>
+		<to>/yarpRTMPose/image:i</to>
 		<protocol>mjpeg</protocol>
 	</connection>
 
 	<connection>
-		<from>/yarpOpenPose/image:o</from>
+		<from>/yarpRTMPose/image:o</from>
 		<to>/view/skeleton</to>
 		<protocol>mjpeg</protocol>
 	</connection>
 
 	<connection>
 		<from>/depthCamera/rgbImage:o</from>
-		<to>/classifier/image:i</to>
+		<to>/mutualgaze/image:i</to>
 		<protocol>mjpeg</protocol>
 	</connection>
 
 	<connection>
-		<from>/yarpOpenPose/target:o</from>
-		<to>/classifier/data:i</to>
+		<from>/yarpRTMPose/target:o</from>
+		<to>/mutualgaze/data:i</to>
 	</connection>
 
 	<connection>
-	  	<from>/classifier/image:o</from>
+	  	<from>/mutualgaze/image:o</from>
 	  	<to>/view/eyecontact</to>
 	  	<protocol>mjpeg</protocol>
 	</connection>
 
 </application>
+
 
