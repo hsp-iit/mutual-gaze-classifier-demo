@@ -286,7 +286,7 @@ RUN git clone https://github.com/robotology/human-sensing.git \
 
 #### Clone repository installation ####
 RUN cd / projects/ && \
-    git clone -b rtm https://github.com/mga-97/mutual-gaze-classifier-demo.git && \
+    git clone -b rtm https://github.com/hsp-iit/mutual-gaze-classifier-demo.git && \
     cd mutual-gaze-classifier-demo && \
     mkdir build && cd build && \
     cmake .. && \
